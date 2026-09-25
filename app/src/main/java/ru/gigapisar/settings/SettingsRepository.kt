@@ -1,0 +1,41 @@
+package ru.gigapisar.settings
+
+import android.content.Context
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.preferencesDataStore
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
+
+private val Context.settingsDataStore by preferencesDataStore(
+    name = "giga_pisar_settings",
+)
+
+enum class InsertionMode {
+    CLIPBOARD,
+    TEXT_FIELD,
+}
+
+object SettingsRepository {
+    private val insertionModeKey =
+        stringPreferencesKey("insertion_mode")
+
+    fun insertionMode(context: Context): Flow<InsertionMode> =
+        context.settingsDataStore.data.map { preferences ->
+            when (
+                preferences[insertionModeKey]
+            ) {
+                InsertionMode.CLIPBOARD.name -> InsertionMode.CLIPBOARD
+                else -> InsertionMode.TEXT_FIELD
+            }
+        }
+
+    suspend fun setInsertionMode(
+        context: Context,
+        mode: InsertionMode,
+    ) {
+        context.settingsDataStore.edit { preferences ->
+            preferences[insertionModeKey] = mode.name
+        }
+    }
+}

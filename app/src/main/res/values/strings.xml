@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <string name="app_name">Гига Писарь</string>
+
+    <string name="accessibility_description">
+        Показывает кнопку голосового ввода над текстовыми полями
+    </string>
+
+    <string name="settings_title">Гига Писарь</string>
+    <string name="clipboard_label">Гига Писарь</string>
+
+    <string name="insertion_mode">Режим вставки</string>
+    <string name="mode_clipboard">Буфер обмена</string>
+    <string name="mode_text_field">Текстовое поле</string>
+
+    <string name="permissions">Разрешения</string>
+    <string name="microphone">Микрофон</string>
+    <string name="microphone_status">%1$s: %2$s</string>
+    <string name="permission_granted">разрешён</string>
+    <string name="permission_denied">не разрешён</string>
+    <string name="grant_microphone">Разрешить микрофон</string>
+
+    <string name="accessibility_service">Сервис специальных возможностей</string>
+    <string name="accessibility_status">%1$s: %2$s</string>
+    <string name="service_enabled">включён</string>
+    <string name="service_disabled">выключен</string>
+    <string name="open_accessibility_settings">Открыть настройки специальных возможностей</string>
+
+    <string name="model">Модель</string>
+    <string name="model_name">Модель GigaAM</string>
+    <string name="model_installed">Модель установлена</string>
+    <string name="model_not_installed">Модель не установлена</string>
+    <string name="model_description">
+        GigaAM v3 E2E CTC INT8, около 225 МБ
+    </string>
+    <string name="download_model">Загрузить модель</string>
+    <string name="downloading_model">Загрузка модели: %1$d%%</string>
+    <string name="download_error">Ошибка загрузки: %1$s</string>
+    <string name="model_verification_failed">Модель скачана, но проверка установки не пройдена</string>
+ 
+    <string name="model_required">Сначала загрузите модель GigaAM</string>
+    <string name="microphone_required">Нет разрешения на использование микрофона</string>
+    <string name="recording_too_short">Запись слишком короткая</string>
+    <string name="transcription_error">Ошибка распознавания: %1$s</string>
+    <string name="empty_transcription">Распознавание не вернуло текст</string>
+    <string name="paste_failed">Не удалось вставить текст в поле</string>
+    <string name="audio_record_error">Не удалось открыть микрофон</string>
+
+    <string name="button_idle">Голосовой ввод</string>
+    <string name="button_recording">Идёт запись</string>
+    <string name="button_processing">Распознавание</string>
+
+</resources>
