@@ -7,7 +7,6 @@
         Показывает кнопку голосового ввода над текстовыми полями
     </string>
 
-    <string name="settings_title">Гига Писарь</string>
     <string name="clipboard_label">Гига Писарь</string>
 
     <string name="insertion_mode">Режим вставки</string>
@@ -27,7 +26,6 @@
     <string name="service_disabled">выключен</string>
     <string name="open_accessibility_settings">Открыть настройки специальных возможностей</string>
 
-    <string name="model">Модель</string>
     <string name="model_name">Модель GigaAM</string>
     <string name="model_installed">Модель установлена</string>
     <string name="model_not_installed">Модель не установлена</string>

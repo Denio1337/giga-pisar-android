@@ -7,6 +7,9 @@ plugins {
     id("com.diffplug.spotless")
 }
 
+val appVersionName = "0.1.1"
+val appVersionCode = 2
+
 val localProperties =
     Properties().apply {
         val file = rootProject.file("local.properties")
@@ -69,8 +72,8 @@ android {
         applicationId = "ru.gigapisar"
         minSdk = 24
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = appVersionCode
+        versionName = appVersionName
     }
 
     if (releaseSigningConfigured) {
@@ -89,7 +92,8 @@ android {
             if (releaseSigningConfigured) {
                 signingConfig = signingConfigs.getByName("release")
             }
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
@@ -130,7 +134,7 @@ tasks.matching { it.name == "assembleRelease" }.configureEach {
         val unsignedApk =
             apkDirectory.resolve("app-release-unsigned.apk")
         val namedApk =
-            apkDirectory.resolve("gigapisar-v0.1.0-release.apk")
+            apkDirectory.resolve("gigapisar-v$appVersionName-release.apk")
         val sourceApk =
             when {
                 defaultApk.isFile -> defaultApk
@@ -163,8 +167,10 @@ dependencies {
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
+
     // Tooling
     debugImplementation(libs.androidx.compose.ui.tooling)
+
     // Navigation
     implementation(libs.androidx.navigation3.ui)
     implementation(libs.androidx.navigation3.runtime)

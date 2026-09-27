@@ -1,33 +1,46 @@
 package ru.gigapisar.overlay
 
 import android.accessibilityservice.AccessibilityService
+import android.content.Context
 import android.graphics.PixelFormat
-import android.graphics.Rect
 import android.view.Gravity
-import android.view.View
 import android.view.WindowManager
+import kotlin.math.roundToInt
 
 class OverlayManager(
     private val service: AccessibilityService,
     onRecordingStart: () -> Unit,
     onRecordingStop: () -> Unit,
 ) {
+    companion object {
+        private const val POSITION_PREFERENCES = "overlay_position"
+        private const val POSITION_X_KEY = "x"
+        private const val POSITION_Y_KEY = "y"
+
+        private const val BUTTON_SIZE_DP = 64
+        private const val EDGE_MARGIN_DP = 12
+        private const val TOP_MARGIN_DP = 96
+    }
+
     private val density =
         service.resources.displayMetrics.density
 
     private val buttonSize =
-        (64 * density).toInt()
+        (BUTTON_SIZE_DP * density).roundToInt()
 
-    private val margin =
-        (8 * density).toInt()
+    private val edgeMargin =
+        (EDGE_MARGIN_DP * density).roundToInt()
 
-    private val button =
-        RecordingButton(service)
+    private val topMargin =
+        (TOP_MARGIN_DP * density).roundToInt()
 
     private val windowManager =
         service.getSystemService(
             WindowManager::class.java,
         )
+
+    private val button =
+        RecordingButton(service)
 
     private val params =
         WindowManager
@@ -45,7 +58,30 @@ class OverlayManager(
 
     private var attached = false
 
-    private var clipboardMode = false
+/*
+ * Position at the moment when the current drag starts.
+ */
+    private var dragStartX = 0
+    private var dragStartY = 0
+
+/*
+ * Pointer position at the moment when the current drag starts.
+ */
+    private var dragPointerStartX = 0f
+    private var dragPointerStartY = 0f
+
+/*
+ * Position that should be displayed on the next frame.
+ */
+    private var targetX = 0
+    private var targetY = 0
+
+/*
+ * Prevents scheduling multiple frame callbacks.
+ */
+    private var frameUpdateScheduled = false
+
+    private var pendingFrameUpdate: Runnable? = null
 
     init {
         button.onRecordingStart =
@@ -53,12 +89,23 @@ class OverlayManager(
 
         button.onRecordingStop =
             onRecordingStop
+
+        button.onDragStart =
+            ::beginDrag
+
+        button.onDrag =
+            ::moveBy
+
+        button.onDragEnd =
+            ::savePosition
     }
 
     fun attach() {
         if (attached) {
             return
         }
+
+        restorePosition()
 
         try {
             windowManager.addView(
@@ -67,101 +114,27 @@ class OverlayManager(
             )
 
             attached = true
-        } catch (_: Throwable) {
+        } catch (_: Exception) {
             attached = false
         }
     }
 
     fun setClipboardMode() {
-        clipboardMode = true
+        show()
+    }
 
+    fun setTextFieldMode() {
+        show()
+    }
+
+    private fun show() {
         if (!attached) {
             attach()
         }
 
-        val metrics =
-            service.resources.displayMetrics
-
-        params.x =
-            metrics.widthPixels -
-            buttonSize -
-            margin
-
-        params.y =
-            metrics.heightPixels / 2 -
-            buttonSize / 2
-
-        button.visibility =
-            View.VISIBLE
-
-        updateLayout()
-    }
-
-    fun setTextFieldMode(bounds: Rect?) {
-        clipboardMode = false
-
-        if (!attached) {
-            attach()
+        if (attached) {
+            button.showAnimated()
         }
-
-        if (bounds == null) {
-            button.visibility =
-                View.GONE
-            return
-        }
-
-        val metrics =
-            service.resources.displayMetrics
-
-        val centerX =
-            bounds.left +
-                bounds.width() / 2
-
-        params.x =
-            (
-                centerX -
-                    buttonSize / 2
-            ).coerceIn(
-                margin,
-                metrics.widthPixels -
-                    buttonSize -
-                    margin,
-            )
-
-        val above =
-            bounds.top -
-                buttonSize -
-                margin
-
-        val below =
-            bounds.bottom +
-                margin
-
-        params.y =
-            if (above >= margin) {
-                above
-            } else {
-                below
-            }.coerceIn(
-                margin,
-                metrics.heightPixels -
-                    buttonSize -
-                    margin,
-            )
-
-        button.visibility =
-            View.VISIBLE
-
-        updateLayout()
-    }
-
-    fun hide() {
-        if (clipboardMode) {
-            return
-        }
-
-        button.visibility =
-            View.GONE
     }
 
     fun setIdle() {
@@ -183,29 +156,233 @@ class OverlayManager(
     }
 
     fun remove() {
+        cancelPendingFrameUpdate()
+
         if (!attached) {
             return
         }
 
         try {
             windowManager.removeView(button)
-        } catch (_: Throwable) {
+        } catch (_: Exception) {
+            // View may already have been removed.
         }
 
         attached = false
     }
 
-    private fun updateLayout() {
+    private fun restorePosition() {
+        val preferences =
+            service.getSharedPreferences(
+                POSITION_PREFERENCES,
+                Context.MODE_PRIVATE,
+            )
+
+        val bounds =
+            getScreenBounds()
+
+        val maxX =
+            (bounds.width - buttonSize - edgeMargin)
+                .coerceAtLeast(edgeMargin)
+
+        val maxY =
+            (bounds.height - buttonSize - edgeMargin)
+                .coerceAtLeast(edgeMargin)
+
+        params.x =
+            preferences
+                .getInt(
+                    POSITION_X_KEY,
+                    maxX,
+                ).coerceIn(
+                    edgeMargin,
+                    maxX,
+                )
+
+        params.y =
+            preferences
+                .getInt(
+                    POSITION_Y_KEY,
+                    topMargin,
+                ).coerceIn(
+                    edgeMargin,
+                    maxY,
+                )
+    }
+
+    private fun beginDrag() {
+    /*
+     * Save the exact position from which this drag started.
+     */
+        dragStartX = params.x
+        dragStartY = params.y
+
+    /*
+     * The current RecordingButton implementation sends movement
+     * deltas, so these values are not actually needed for the
+     * calculation below. They are kept here to make the drag
+     * coordinate system explicit and easy to extend.
+     */
+        dragPointerStartX = 0f
+        dragPointerStartY = 0f
+
+        targetX = params.x
+        targetY = params.y
+    }
+
+    private fun moveBy(
+        dx: Float,
+        dy: Float,
+    ) {
         if (!attached) {
             return
         }
+
+        val bounds =
+            getScreenBounds()
+
+        val maxX =
+            (bounds.width - buttonSize - edgeMargin)
+                .coerceAtLeast(edgeMargin)
+
+        val maxY =
+            (bounds.height - buttonSize - edgeMargin)
+                .coerceAtLeast(edgeMargin)
+
+    /*
+     * The RecordingButton provides movement since the previous
+     * MotionEvent. Accumulate it in floating point and round only
+     * once when calculating the final WindowManager position.
+     *
+     * This avoids repeated toInt() truncation.
+     */
+        val newX =
+            targetX + dx.roundToInt()
+
+        val newY =
+            targetY + dy.roundToInt()
+
+        targetX =
+            newX.coerceIn(
+                edgeMargin,
+                maxX,
+            )
+
+        targetY =
+            newY.coerceIn(
+                edgeMargin,
+                maxY,
+            )
+
+        scheduleFrameUpdate()
+    }
+
+    private fun scheduleFrameUpdate() {
+        if (frameUpdateScheduled || !attached) {
+            return
+        }
+
+        frameUpdateScheduled = true
+
+        val update =
+            Runnable {
+                pendingFrameUpdate = null
+                frameUpdateScheduled = false
+
+                if (!attached) {
+                    return@Runnable
+                }
+
+                if (
+                    params.x == targetX &&
+                    params.y == targetY
+                ) {
+                    return@Runnable
+                }
+
+                params.x = targetX
+                params.y = targetY
+
+                try {
+                    windowManager.updateViewLayout(
+                        button,
+                        params,
+                    )
+                } catch (_: Exception) {
+                    attached = false
+                }
+            }
+
+        pendingFrameUpdate = update
+        button.postOnAnimation(update)
+    }
+
+    private fun savePosition() {
+    /*
+     * There may still be one pending VSYNC update.
+     *
+     * Apply it synchronously before persisting the position,
+     * otherwise the saved coordinates could lag behind the
+     * actual final position.
+     */
+        applyPendingPosition()
+
+        service
+            .getSharedPreferences(
+                POSITION_PREFERENCES,
+                Context.MODE_PRIVATE,
+            ).edit()
+            .putInt(
+                POSITION_X_KEY,
+                params.x,
+            ).putInt(
+                POSITION_Y_KEY,
+                params.y,
+            ).apply()
+    }
+
+    private fun applyPendingPosition() {
+        if (!attached) {
+            return
+        }
+
+        params.x = targetX
+        params.y = targetY
 
         try {
             windowManager.updateViewLayout(
                 button,
                 params,
             )
-        } catch (_: Throwable) {
+        } catch (_: Exception) {
+            attached = false
         }
+
+        frameUpdateScheduled = false
     }
+
+    private fun cancelPendingFrameUpdate() {
+        if (!frameUpdateScheduled) {
+            return
+        }
+
+        pendingFrameUpdate?.let(button::removeCallbacks)
+        pendingFrameUpdate = null
+        frameUpdateScheduled = false
+    }
+
+    private fun getScreenBounds(): ScreenBounds {
+        val metrics =
+            service.resources.displayMetrics
+
+        return ScreenBounds(
+            width = metrics.widthPixels,
+            height = metrics.heightPixels,
+        )
+    }
+
+    private data class ScreenBounds(
+        val width: Int,
+        val height: Int,
+    )
 }

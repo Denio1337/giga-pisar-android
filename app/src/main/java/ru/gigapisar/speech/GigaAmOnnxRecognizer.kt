@@ -83,7 +83,7 @@ class GigaAmOnnxRecognizer(
                     ),
                 )
 
-            try {
+            result.use { result ->
                 @Suppress("UNCHECKED_CAST")
                 val output =
                     result[0].value
@@ -93,8 +93,6 @@ class GigaAmOnnxRecognizer(
                     output = output[0],
                     vocabulary = currentVocabulary,
                 )
-            } finally {
-                result.close()
             }
         } finally {
             featureTensor.close()
@@ -312,7 +310,25 @@ class GigaAmOnnxRecognizer(
         data class Result(
             val features: FloatArray,
             val frameCount: Int,
-        )
+        ) {
+            override fun equals(other: Any?): Boolean {
+                if (this === other) return true
+                if (javaClass != other?.javaClass) return false
+
+                other as Result
+
+                if (frameCount != other.frameCount) return false
+                if (!features.contentEquals(other.features)) return false
+
+                return true
+            }
+
+            override fun hashCode(): Int {
+                var result = frameCount
+                result = 31 * result + features.contentHashCode()
+                return result
+            }
+        }
 
         fun extract(pcm: ShortArray): Result {
             require(

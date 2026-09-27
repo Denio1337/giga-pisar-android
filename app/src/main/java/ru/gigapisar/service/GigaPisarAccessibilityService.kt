@@ -3,7 +3,6 @@ package ru.gigapisar.service
 import android.Manifest
 import android.accessibilityservice.AccessibilityService
 import android.content.pm.PackageManager
-import android.graphics.Rect
 import android.os.Handler
 import android.os.Looper
 import android.view.accessibility.AccessibilityEvent
@@ -104,7 +103,8 @@ class GigaPisarAccessibilityService : AccessibilityService() {
                         }
 
                         InsertionMode.TEXT_FIELD -> {
-                            updateTextFieldOverlay()
+                            overlay.setTextFieldMode()
+                            updateFocusedNode()
                         }
                     }
                 }
@@ -114,97 +114,30 @@ class GigaPisarAccessibilityService : AccessibilityService() {
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         event ?: return
 
-        if (
-            insertionMode ==
-            InsertionMode.CLIPBOARD
-        ) {
-            return
-        }
-
         when (event.eventType) {
             AccessibilityEvent.TYPE_VIEW_FOCUSED,
             AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED,
             AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED,
             AccessibilityEvent.TYPE_VIEW_TEXT_SELECTION_CHANGED,
             -> {
-                updateTextFieldOverlay(event)
+                if (insertionMode == InsertionMode.TEXT_FIELD) {
+                    updateFocusedNode(event)
+                }
             }
         }
     }
 
-    private fun updateTextFieldOverlay(event: AccessibilityEvent? = null) {
+    private fun updateFocusedNode(event: AccessibilityEvent? = null) {
         val node =
-            findFocusedEditable(
-                event?.source,
-            )
-                ?: findFocusedEditable(
-                    rootInActiveWindow,
-                )
+            findFocusedEditable(event?.source)
+                ?: findFocusedEditable(rootInActiveWindow)
 
         if (node == null) {
             focusedNode = null
-
-            mainHandler.post {
-                overlay.hide()
-            }
-
             return
         }
 
-        try {
-            focusedNode?.recycle()
-        } catch (_: Throwable) {
-        }
-
-        focusedNode =
-            AccessibilityNodeInfo.obtain(node)
-
-        val bounds =
-            Rect()
-
-        node.getBoundsInScreen(bounds)
-
-        mainHandler.post {
-            overlay.setTextFieldMode(
-                bounds,
-            )
-        }
-    }
-
-    private fun updateTextFieldOverlay() {
-        if (
-            insertionMode !=
-            InsertionMode.TEXT_FIELD
-        ) {
-            return
-        }
-
-        val node =
-            findFocusedEditable(
-                rootInActiveWindow,
-            )
-
-        if (node == null) {
-            overlay.hide()
-            return
-        }
-
-        try {
-            focusedNode?.recycle()
-        } catch (_: Throwable) {
-        }
-
-        focusedNode =
-            AccessibilityNodeInfo.obtain(node)
-
-        val bounds =
-            Rect()
-
-        node.getBoundsInScreen(bounds)
-
-        overlay.setTextFieldMode(
-            bounds,
-        )
+        focusedNode = node
     }
 
     private fun findFocusedEditable(node: AccessibilityNodeInfo?): AccessibilityNodeInfo? {
@@ -393,11 +326,6 @@ class GigaPisarAccessibilityService : AccessibilityService() {
         audioRecorder.cancel()
 
         recordingJob?.cancel()
-
-        try {
-            focusedNode?.recycle()
-        } catch (_: Throwable) {
-        }
 
         focusedNode = null
 

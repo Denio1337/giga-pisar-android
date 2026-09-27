@@ -2,11 +2,14 @@ package ru.gigapisar.overlay
 
 import android.content.Context
 import android.graphics.Canvas
+import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.RectF
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration
 import ru.gigapisar.R
+import kotlin.math.abs
 
 class RecordingButton(
     context: Context,
@@ -17,86 +20,278 @@ class RecordingButton(
         PROCESSING,
     }
 
-    private val density =
-        resources.displayMetrics.density
+    companion object {
+        private const val BUTTON_SIZE_DP = 64
+        private const val VISIBILITY_ANIMATION_DURATION = 180L
+        private const val PRESSED_SCALE = 0.94f
+    }
 
-    private val size =
-        (64 * density).toInt()
+    private val density = resources.displayMetrics.density
 
-    private var state =
-        State.IDLE
+    private val buttonSize =
+        (BUTTON_SIZE_DP * density).toInt()
 
-    var onRecordingStart:
-        (() -> Unit)? = null
+    private val touchSlop =
+        ViewConfiguration.get(context).scaledTouchSlop
 
-    var onRecordingStop:
-        (() -> Unit)? = null
+    private var state = State.IDLE
+
+/**
+     * True while the current touch gesture is being used
+     * to move the floating button.
+     */
+    private var dragging = false
+
+/**
+     * Previous raw pointer position.
+     *
+     * We use deltas instead of calculating the complete position
+     * here because the owner of the overlay should decide where
+     * the WindowManager.LayoutParams should be placed.
+     */
+    private var lastRawX = 0f
+    private var lastRawY = 0f
+
+    private var downRawX = 0f
+    private var downRawY = 0f
+
+/**
+     * Whether recording was started for the current gesture.
+     */
+    private var recordingForCurrentGesture = false
+
+    var onRecordingStart: (() -> Unit)? = null
+
+    var onRecordingStop: (() -> Unit)? = null
+
+/**
+     * Called once when the finger moves far enough
+     * to turn the gesture into a drag.
+     */
+    var onDragStart: (() -> Unit)? = null
+
+/**
+     * Receives movement delta in screen coordinates.
+     *
+     * dx/dy are relative to the previous MotionEvent,
+     * not relative to ACTION_DOWN.
+     */
+    var onDrag: ((dx: Float, dy: Float) -> Unit)? = null
+
+    var onDragEnd: (() -> Unit)? = null
 
     private val paint =
         Paint(Paint.ANTI_ALIAS_FLAG)
 
     private val iconPaint =
         Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = 0xFFFFFFFF.toInt()
+            color = Color.WHITE
             style = Paint.Style.FILL
         }
 
     private val strokePaint =
         Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = 0xFFFFFFFF.toInt()
+            color = Color.WHITE
             style = Paint.Style.STROKE
             strokeWidth = 3f * density
             strokeCap = Paint.Cap.ROUND
         }
 
     init {
+        visibility = GONE
+        alpha = 0f
+        scaleX = 0.9f
+        scaleY = 0.9f
+
         isClickable = true
+        isFocusable = true
+
         importantForAccessibility =
             IMPORTANT_FOR_ACCESSIBILITY_YES
 
         contentDescription =
-            context.getString(
-                R.string.button_idle,
-            )
+            context.getString(R.string.button_idle)
 
-        setBackgroundColor(
-            android.graphics.Color.TRANSPARENT,
-        )
+        setBackgroundColor(Color.TRANSPARENT)
     }
 
     override fun onMeasure(
         widthMeasureSpec: Int,
         heightMeasureSpec: Int,
     ) {
-        setMeasuredDimension(size, size)
+        setMeasuredDimension(
+            buttonSize,
+            buttonSize,
+        )
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
-                if (state == State.IDLE) {
-                    setState(
-                        State.RECORDING,
-                    )
-                    onRecordingStart?.invoke()
+                if (state != State.IDLE) {
+                    return false
                 }
+
+                dragging = false
+                recordingForCurrentGesture = true
+
+                downRawX = event.rawX
+                downRawY = event.rawY
+
+                lastRawX = event.rawX
+                lastRawY = event.rawY
+
+            /*
+             * Start recording immediately.
+             *
+             * Previously this was delayed by
+             * ViewConfiguration.getLongPressTimeout(),
+             * which made the button feel unresponsive.
+             */
+                setState(State.RECORDING)
+                onRecordingStart?.invoke()
+
+            /*
+             * Small visual feedback that the press was accepted.
+             */
+                animate()
+                    .scaleX(PRESSED_SCALE)
+                    .scaleY(PRESSED_SCALE)
+                    .setDuration(80L)
+                    .start()
 
                 return true
             }
 
-            MotionEvent.ACTION_UP,
-            MotionEvent.ACTION_CANCEL,
-            -> {
-                if (state == State.RECORDING) {
-                    setState(State.PROCESSING)
-                    onRecordingStop?.invoke()
+            MotionEvent.ACTION_MOVE -> {
+                if (state != State.RECORDING && !dragging) {
+                    return true
                 }
 
+                val totalDx =
+                    event.rawX - downRawX
+
+                val totalDy =
+                    event.rawY - downRawY
+
+            /*
+             * Use Android's standard touch slop.
+             *
+             * This avoids interpreting tiny finger movements
+             * as a drag.
+             */
+                if (!dragging) {
+                    val distanceExceeded =
+                        abs(totalDx) > touchSlop ||
+                            abs(totalDy) > touchSlop
+
+                    if (!distanceExceeded) {
+                        return true
+                    }
+
+                /*
+                 * The user actually wants to move the button.
+                 *
+                 * Stop recording immediately and switch
+                 * the current gesture to dragging.
+                 */
+                    dragging = true
+
+                    if (recordingForCurrentGesture) {
+                        recordingForCurrentGesture = false
+
+                        setState(State.IDLE)
+                        onRecordingStop?.invoke()
+                    }
+
+                    animate()
+                        .scaleX(1f)
+                        .scaleY(1f)
+                        .setDuration(80L)
+                        .start()
+
+                    onDragStart?.invoke()
+
+                /*
+                 * Don't send the whole distance from ACTION_DOWN.
+                 * The owner receives movement starting from this point.
+                 */
+                    lastRawX = event.rawX
+                    lastRawY = event.rawY
+
+                    return true
+                }
+
+            /*
+             * Smooth drag:
+             *
+             * Instead of calculating the complete position and
+             * maintaining another coordinate system here, only
+             * report the actual movement since the previous event.
+             */
+                val dx =
+                    event.rawX - lastRawX
+
+                val dy =
+                    event.rawY - lastRawY
+
+                if (dx != 0f || dy != 0f) {
+                    onDrag?.invoke(dx, dy)
+                }
+
+                lastRawX = event.rawX
+                lastRawY = event.rawY
+
+                return true
+            }
+
+            MotionEvent.ACTION_UP -> {
+                finishGesture(cancelled = false)
+                return true
+            }
+
+            MotionEvent.ACTION_CANCEL -> {
+                finishGesture(cancelled = true)
                 return true
             }
         }
 
         return true
+    }
+
+    private fun finishGesture(cancelled: Boolean) {
+        val wasDragging = dragging
+        val wasRecording =
+            recordingForCurrentGesture
+
+        dragging = false
+        recordingForCurrentGesture = false
+
+        animate()
+            .scaleX(1f)
+            .scaleY(1f)
+            .setDuration(80L)
+            .start()
+
+        when {
+            wasDragging -> {
+                onDragEnd?.invoke()
+            }
+
+            wasRecording -> {
+                setState(State.PROCESSING)
+                onRecordingStop?.invoke()
+            }
+
+            cancelled -> {
+            /*
+             * Nothing else to do.
+             *
+             * The recording callback has already been sent
+             * if recording was active.
+             */
+            }
+        }
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -157,9 +352,9 @@ class RecordingButton(
         }
 
         drawMicrophone(
-            canvas,
-            center,
-            center,
+            canvas = canvas,
+            cx = center,
+            cy = center,
         )
     }
 
@@ -185,6 +380,60 @@ class RecordingButton(
 
     fun reset() {
         setState(State.IDLE)
+
+        dragging = false
+        recordingForCurrentGesture = false
+
+        animate().cancel()
+
+        scaleX = 1f
+        scaleY = 1f
+    }
+
+    fun showAnimated(onEnd: (() -> Unit)? = null) {
+        if (visibility == VISIBLE) {
+            onEnd?.invoke()
+            return
+        }
+
+        animate().cancel()
+
+        visibility = VISIBLE
+        alpha = 0f
+        scaleX = 0.9f
+        scaleY = 0.9f
+
+        animate()
+            .alpha(1f)
+            .scaleX(1f)
+            .scaleY(1f)
+            .setDuration(VISIBILITY_ANIMATION_DURATION)
+            .withEndAction {
+                onEnd?.invoke()
+            }.start()
+    }
+
+    fun hideAnimated(onEnd: (() -> Unit)? = null) {
+        if (visibility != VISIBLE) {
+            onEnd?.invoke()
+            return
+        }
+
+        animate().cancel()
+
+        animate()
+            .alpha(0f)
+            .scaleX(0.9f)
+            .scaleY(0.9f)
+            .setDuration(VISIBILITY_ANIMATION_DURATION)
+            .withEndAction {
+                visibility = GONE
+                alpha = 0f
+                scaleX = 0.9f
+                scaleY = 0.9f
+
+                onEnd?.invoke()
+            }.start()
     }
 
     private fun drawMicrophone(
@@ -192,30 +441,30 @@ class RecordingButton(
         cx: Float,
         cy: Float,
     ) {
-        val width =
+        val microphoneWidth =
             12 * density
 
-        val height =
+        val microphoneHeight =
             20 * density
 
         val left =
-            cx - width / 2
+            cx - microphoneWidth / 2
 
         val top =
-            cy - height / 2
+            cy - microphoneHeight / 2
 
-        val rect =
+        val microphoneRect =
             RectF(
                 left,
                 top,
-                left + width,
-                top + height,
+                left + microphoneWidth,
+                top + microphoneHeight,
             )
 
         canvas.drawRoundRect(
-            rect,
-            width / 2,
-            width / 2,
+            microphoneRect,
+            microphoneWidth / 2,
+            microphoneWidth / 2,
             iconPaint,
         )
 
