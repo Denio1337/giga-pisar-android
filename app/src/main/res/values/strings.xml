@@ -4,7 +4,7 @@
     <string name="app_name">Гига Писарь</string>
 
     <string name="accessibility_description">
-        Показывает кнопку голосового ввода над текстовыми полями
+        Показывает кнопку голосового ввода над текстовыми полями и позволяет запускать запись удержанием кнопки уменьшения громкости.
     </string>
 
     <string name="clipboard_label">Гига Писарь</string>
@@ -12,6 +12,10 @@
     <string name="insertion_mode">Режим вставки</string>
     <string name="mode_clipboard">Буфер обмена</string>
     <string name="mode_text_field">Текстовое поле</string>
+
+    <string name="recording_button">Кнопка записи</string>
+    <string name="show_recording_button">Показывать виртуальную кнопку записи</string>
+    <string name="text_field_button_visibility_hint">В режиме «Текстовое поле» кнопка отображается, когда на экране есть активное поле ввода.</string>
 
     <string name="permissions">Разрешения</string>
     <string name="microphone">Микрофон</string>
@@ -43,7 +47,7 @@
     <string name="transcription_error">Ошибка распознавания: %1$s</string>
     <string name="empty_transcription">Распознавание не вернуло текст</string>
     <string name="paste_failed">Не удалось вставить текст в поле</string>
-    <string name="audio_record_error">Не удалось открыть микрофон</string>
+    <string name="audio_record_error">Не удалось получить доступ к микрофону</string>
 
     <string name="button_idle">Голосовой ввод</string>
     <string name="button_recording">Идёт запись</string>

@@ -119,21 +119,19 @@ class OverlayManager(
         }
     }
 
-    fun setClipboardMode() {
-        show()
-    }
-
-    fun setTextFieldMode() {
-        show()
-    }
-
-    private fun show() {
-        if (!attached) {
+    fun setButtonVisible(visible: Boolean) {
+        if (!attached && visible) {
             attach()
         }
 
-        if (attached) {
+        if (!attached) {
+            return
+        }
+
+        if (visible) {
             button.showAnimated()
+        } else {
+            button.hideAnimated()
         }
     }
 

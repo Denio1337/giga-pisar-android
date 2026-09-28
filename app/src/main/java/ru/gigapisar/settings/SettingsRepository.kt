@@ -1,6 +1,7 @@
 package ru.gigapisar.settings
 
 import android.content.Context
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -20,6 +21,9 @@ object SettingsRepository {
     private val insertionModeKey =
         stringPreferencesKey("insertion_mode")
 
+    private val virtualButtonVisibleKey =
+        booleanPreferencesKey("virtual_button_visible")
+
     fun insertionMode(context: Context): Flow<InsertionMode> =
         context.settingsDataStore.data.map { preferences ->
             when (
@@ -30,12 +34,26 @@ object SettingsRepository {
             }
         }
 
+    fun virtualButtonVisible(context: Context): Flow<Boolean> =
+        context.settingsDataStore.data.map { preferences ->
+            preferences[virtualButtonVisibleKey] ?: true
+        }
+
     suspend fun setInsertionMode(
         context: Context,
         mode: InsertionMode,
     ) {
         context.settingsDataStore.edit { preferences ->
             preferences[insertionModeKey] = mode.name
+        }
+    }
+
+    suspend fun setVirtualButtonVisible(
+        context: Context,
+        visible: Boolean,
+    ) {
+        context.settingsDataStore.edit { preferences ->
+            preferences[virtualButtonVisibleKey] = visible
         }
     }
 }

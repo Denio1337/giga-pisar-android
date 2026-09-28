@@ -2,9 +2,12 @@ package ru.gigapisar.service
 
 import android.Manifest
 import android.accessibilityservice.AccessibilityService
+import android.content.Context
 import android.content.pm.PackageManager
+import android.media.AudioManager
 import android.os.Handler
 import android.os.Looper
+import android.view.KeyEvent
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import android.widget.Toast
@@ -36,6 +39,10 @@ class GigaPisarAccessibilityService : AccessibilityService() {
     private val audioRecorder =
         AudioRecorder()
 
+    private val audioManager: AudioManager by lazy {
+        getSystemService(Context.AUDIO_SERVICE) as AudioManager
+    }
+
     private lateinit var modelManager:
         ModelManager
 
@@ -51,16 +58,36 @@ class GigaPisarAccessibilityService : AccessibilityService() {
     private var insertionMode =
         InsertionMode.TEXT_FIELD
 
+    private var virtualButtonEnabled = true
+
     private var focusedNode:
         AccessibilityNodeInfo? = null
 
     private var recordingJob: Job? = null
+
+    private var volumeKeyPressed = false
+    private var volumeKeyHoldTriggered = false
+    private var volumeKeyStartedRecording = false
 
     @Volatile
     private var recording = false
 
     private val mainHandler =
         Handler(Looper.getMainLooper())
+
+    private val volumeKeyHoldRunnable =
+        Runnable {
+            if (!volumeKeyPressed) {
+                return@Runnable
+            }
+
+            volumeKeyHoldTriggered = true
+
+            if (!recording && recordingJob?.isActive != true) {
+                handleRecordingStart()
+                volumeKeyStartedRecording = recording
+            }
+        }
 
     override fun onServiceConnected() {
         super.onServiceConnected()
@@ -88,8 +115,6 @@ class GigaPisarAccessibilityService : AccessibilityService() {
                 },
             )
 
-        overlay.attach()
-
         serviceScope.launch {
             SettingsRepository
                 .insertionMode(this@GigaPisarAccessibilityService)
@@ -97,17 +122,73 @@ class GigaPisarAccessibilityService : AccessibilityService() {
 
                     insertionMode = mode
 
-                    when (mode) {
-                        InsertionMode.CLIPBOARD -> {
-                            overlay.setClipboardMode()
-                        }
-
-                        InsertionMode.TEXT_FIELD -> {
-                            overlay.setTextFieldMode()
-                            updateFocusedNode()
-                        }
+                    if (mode == InsertionMode.TEXT_FIELD) {
+                        updateFocusedNode()
+                    } else {
+                        updateButtonVisibility()
                     }
                 }
+        }
+
+        serviceScope.launch {
+            SettingsRepository
+                .virtualButtonVisible(this@GigaPisarAccessibilityService)
+                .collectLatest { visible ->
+                    virtualButtonEnabled = visible
+                    updateButtonVisibility()
+                }
+        }
+    }
+
+    override fun onKeyEvent(event: KeyEvent): Boolean {
+        if (event.keyCode != KeyEvent.KEYCODE_VOLUME_DOWN) {
+            return false
+        }
+
+        return when (event.action) {
+            KeyEvent.ACTION_DOWN -> {
+                if (volumeKeyPressed) {
+                    true
+                } else if (event.repeatCount != 0) {
+                    false
+                } else {
+                    volumeKeyPressed = true
+                    volumeKeyHoldTriggered = false
+                    volumeKeyStartedRecording = false
+                    mainHandler.postDelayed(
+                        volumeKeyHoldRunnable,
+                        VOLUME_RECORDING_HOLD_DELAY_MS,
+                    )
+                    true
+                }
+            }
+
+            KeyEvent.ACTION_UP -> {
+                if (!volumeKeyPressed) {
+                    return false
+                }
+
+                mainHandler.removeCallbacks(volumeKeyHoldRunnable)
+                volumeKeyPressed = false
+
+                if (volumeKeyHoldTriggered) {
+                    if (volumeKeyStartedRecording) {
+                        handleRecordingStop()
+                    }
+                } else {
+                    audioManager.adjustStreamVolume(
+                        AudioManager.STREAM_ACCESSIBILITY,
+                        AudioManager.ADJUST_LOWER,
+                        AudioManager.FLAG_SHOW_UI,
+                    )
+                }
+
+                volumeKeyHoldTriggered = false
+                volumeKeyStartedRecording = false
+                true
+            }
+
+            else -> volumeKeyPressed
         }
     }
 
@@ -134,10 +215,23 @@ class GigaPisarAccessibilityService : AccessibilityService() {
 
         if (node == null) {
             focusedNode = null
+            updateButtonVisibility()
             return
         }
 
         focusedNode = node
+        updateButtonVisibility()
+    }
+
+    private fun updateButtonVisibility() {
+        val shouldShow =
+            virtualButtonEnabled &&
+                (
+                    insertionMode == InsertionMode.CLIPBOARD ||
+                        focusedNode != null
+                )
+
+        overlay.setButtonVisible(shouldShow)
     }
 
     private fun findFocusedEditable(node: AccessibilityNodeInfo?): AccessibilityNodeInfo? {
@@ -315,12 +409,14 @@ class GigaPisarAccessibilityService : AccessibilityService() {
     }
 
     override fun onInterrupt() {
+        cancelVolumeKeyGesture()
         recording = false
         audioRecorder.cancel()
         overlay.setIdle()
     }
 
     override fun onDestroy() {
+        cancelVolumeKeyGesture()
         recording = false
 
         audioRecorder.cancel()
@@ -347,5 +443,16 @@ class GigaPisarAccessibilityService : AccessibilityService() {
                     Toast.LENGTH_SHORT,
                 ).show()
         }
+    }
+
+    private fun cancelVolumeKeyGesture() {
+        mainHandler.removeCallbacks(volumeKeyHoldRunnable)
+        volumeKeyPressed = false
+        volumeKeyHoldTriggered = false
+        volumeKeyStartedRecording = false
+    }
+
+    companion object {
+        private const val VOLUME_RECORDING_HOLD_DELAY_MS = 150L
     }
 }

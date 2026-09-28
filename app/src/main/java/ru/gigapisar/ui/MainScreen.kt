@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -34,6 +36,7 @@ import kotlin.time.Duration.Companion.milliseconds
 fun MainScreen(activity: ComponentActivity) {
     val context = LocalContext.current
     var insertionMode by remember { mutableStateOf(InsertionMode.TEXT_FIELD) }
+    var virtualButtonVisible by remember { mutableStateOf(true) }
     var modelInstalled by remember { mutableStateOf(ModelManager(context).isInstalled()) }
     var accessibilityEnabled by remember {
         mutableStateOf(isAccessibilityServiceEnabled(context))
@@ -44,6 +47,12 @@ fun MainScreen(activity: ComponentActivity) {
     LaunchedEffect(context) {
         SettingsRepository.insertionMode(context).collect { mode ->
             insertionMode = mode
+        }
+    }
+
+    LaunchedEffect(context) {
+        SettingsRepository.virtualButtonVisible(context).collect { visible ->
+            virtualButtonVisible = visible
         }
     }
 
@@ -62,6 +71,7 @@ fun MainScreen(activity: ComponentActivity) {
                 modifier =
                     Modifier
                         .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
                         .statusBarsPadding()
                         .padding(20.dp),
                 verticalArrangement = Arrangement.spacedBy(18.dp),
@@ -75,6 +85,15 @@ fun MainScreen(activity: ComponentActivity) {
                     onModeSelected = { mode ->
                         scope.launch {
                             SettingsRepository.setInsertionMode(context, mode)
+                        }
+                    },
+                )
+                VirtualButtonVisibilityCard(
+                    visible = virtualButtonVisible,
+                    showTextFieldHint = insertionMode == InsertionMode.TEXT_FIELD,
+                    onVisibilityChanged = { visible ->
+                        scope.launch {
+                            SettingsRepository.setVirtualButtonVisible(context, visible)
                         }
                     },
                 )
