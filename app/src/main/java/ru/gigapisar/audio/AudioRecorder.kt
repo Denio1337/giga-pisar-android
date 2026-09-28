@@ -28,6 +28,14 @@ class AudioRecorder {
     @Volatile
     private var recording = false
 
+    /**
+     * Loudness of the latest audio chunk, 0..1 (peak of the chunk). The recording pill
+     * reads it every frame to draw the wave; it is 0 when nothing is being recorded.
+     */
+    @Volatile
+    var level: Float = 0f
+        private set
+
     fun start(): Boolean {
         synchronized(lock) {
             if (recording) {
@@ -141,6 +149,7 @@ class AudioRecorder {
                                 count,
                             )
                         }
+                        level = peakOf(buffer, count)
                     }
 
                     count == AudioRecord.ERROR_DEAD_OBJECT -> {
@@ -158,7 +167,24 @@ class AudioRecorder {
             }
         } finally {
             recording = false
+            level = 0f
         }
+    }
+
+    /** Peak of little-endian 16-bit PCM, scaled to 0..1. */
+    private fun peakOf(
+        bytes: ByteArray,
+        count: Int,
+    ): Float {
+        var peak = 0
+        var i = 0
+        while (i + 1 < count) {
+            val sample = (bytes[i].toInt() and 0xFF) or (bytes[i + 1].toInt() shl 8)
+            val magnitude = if (sample < 0) -sample else sample
+            if (magnitude > peak) peak = magnitude
+            i += 2
+        }
+        return (peak / 32768f).coerceIn(0f, 1f)
     }
 
     fun stop(): ShortArray {

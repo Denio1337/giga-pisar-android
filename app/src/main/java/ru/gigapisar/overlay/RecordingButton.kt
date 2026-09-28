@@ -3,13 +3,19 @@ package ru.gigapisar.overlay
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.LinearGradient
 import android.graphics.Paint
 import android.graphics.RectF
+import android.graphics.Shader
+import android.os.SystemClock
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
 import ru.gigapisar.R
 import kotlin.math.abs
+import kotlin.math.hypot
+import kotlin.math.max
+import kotlin.math.sqrt
 
 class RecordingButton(
     context: Context,
@@ -21,7 +27,11 @@ class RecordingButton(
     }
 
     companion object {
-        private const val BUTTON_SIZE_DP = 64
+        // The window is larger than the circle so the pulse rings fit around it.
+        private const val BUTTON_SIZE_DP = 120
+        private const val CIRCLE_RADIUS_DP = 43
+        private const val RING_PERIOD_MS = 1600L
+        private const val DRAG_WINDOW_MS = 250L
         private const val VISIBILITY_ANIMATION_DURATION = 180L
         private const val PRESSED_SCALE = 0.94f
     }
@@ -89,6 +99,46 @@ class RecordingButton(
             style = Paint.Style.FILL
         }
 
+    private val circleRadius = CIRCLE_RADIUS_DP * density
+
+    /** Microphone level 0..1 while recording; drives the glow and the halos. */
+    var level: () -> Float = { 0f }
+
+    /** Dimmed while the app is not ready (no model yet). */
+    var dimmed = false
+        set(value) {
+            field = value
+            invalidate()
+        }
+
+    private val shadowPaint =
+        Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0x33000000 }
+
+    private val effectPaint =
+        Paint(Paint.ANTI_ALIAS_FLAG)
+
+    private val arcPaint =
+        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            strokeWidth = 3f * density
+            strokeCap = Paint.Cap.ROUND
+            color = 0xFF1FA03A.toInt()
+        }
+
+    private var greenShader: Shader? = null
+    private var runningPeak = 0.05f
+    private var smoothLevel = 0f
+    private var animationStart = 0L
+
+    private val frame =
+        object : Runnable {
+            override fun run() {
+                if (state == State.IDLE || visibility != VISIBLE) return
+                invalidate()
+                postOnAnimation(this)
+            }
+        }
+
     private val strokePaint =
         Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.WHITE
@@ -129,6 +179,10 @@ class RecordingButton(
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 if (state != State.IDLE) {
+                    return false
+                }
+
+                if (hypot(event.x - width / 2f, event.y - height / 2f) > circleRadius + 6 * density) {
                     return false
                 }
 
@@ -181,6 +235,12 @@ class RecordingButton(
              * as a drag.
              */
                 if (!dragging) {
+                    // Once recording is under way the finger may wander: only a quick
+                    // move right after the touch turns the gesture into a drag.
+                    if (event.eventTime - event.downTime > DRAG_WINDOW_MS) {
+                        return true
+                    }
+
                     val distanceExceeded =
                         abs(totalDx) > touchSlop ||
                             abs(totalDy) > touchSlop
@@ -294,68 +354,76 @@ class RecordingButton(
         }
     }
 
+    override fun onSizeChanged(
+        w: Int,
+        h: Int,
+        oldw: Int,
+        oldh: Int,
+    ) {
+        super.onSizeChanged(w, h, oldw, oldh)
+        val c = w / 2f
+        val r = circleRadius
+        // The website's palette: light green to teal.
+        greenShader =
+            LinearGradient(
+                c - r,
+                c - r,
+                c + r,
+                c + r,
+                intArrayOf(0xFFA8E063.toInt(), 0xFF1FA03A.toInt(), 0xFF008F92.toInt()),
+                floatArrayOf(0f, 0.55f, 1f),
+                Shader.TileMode.CLAMP,
+            )
+    }
+
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
 
-        val center =
-            width / 2f
+        val c = width / 2f
+        val r = circleRadius
+        val alpha = if (dimmed) 115 else 255
+        val t = (SystemClock.uptimeMillis() - animationStart).toFloat()
 
-        val radius =
-            width * 0.38f
+        if (state == State.RECORDING) {
+            // Glow that follows the voice, with the same adaptive scale as the pill.
+            val raw = level()
+            runningPeak = max(raw, runningPeak * 0.995f).coerceAtLeast(0.02f)
+            val loud = sqrt((raw / runningPeak).coerceIn(0f, 1f))
+            smoothLevel += (loud - smoothLevel) * 0.3f
+            effectPaint.style = Paint.Style.FILL
+            effectPaint.color = 0x4063CF62
+            canvas.drawCircle(c, c, r * (1.04f + 0.3f * smoothLevel), effectPaint)
 
-        when (state) {
-            State.IDLE -> {
-                paint.color =
-                    0xB033B955.toInt()
-
-                canvas.drawCircle(
-                    center,
-                    center,
-                    radius,
-                    paint,
-                )
-            }
-
-            State.RECORDING -> {
-                paint.color =
-                    0xFF4CAF50.toInt()
-
-                canvas.drawCircle(
-                    center,
-                    center,
-                    radius + 3 * density,
-                    paint,
-                )
-
-                paint.color =
-                    0xFFFF3030.toInt()
-
-                canvas.drawCircle(
-                    center,
-                    center,
-                    8 * density,
-                    paint,
-                )
-            }
-
-            State.PROCESSING -> {
-                paint.color =
-                    0xCC2E7D32.toInt()
-
-                canvas.drawCircle(
-                    center,
-                    center,
-                    radius,
-                    paint,
-                )
+            // Two halos spreading out from the button, brighter while speaking.
+            effectPaint.style = Paint.Style.STROKE
+            effectPaint.strokeWidth = 4f * density
+            for (k in 0..1) {
+                val p = ((t / RING_PERIOD_MS) + k * 0.5f) % 1f
+                val strength = 0.2f + 0.6f * smoothLevel
+                effectPaint.color = ((strength * (1f - p) * 255).toInt() shl 24) or 0x1FA03A
+                canvas.drawCircle(c, c, r * (1f + 0.34f * p), effectPaint)
             }
         }
 
-        drawMicrophone(
-            canvas = canvas,
-            cx = center,
-            cy = center,
-        )
+        canvas.drawCircle(c, c + 2 * density, r, shadowPaint.apply { this.alpha = alpha / 5 })
+        paint.shader = greenShader
+        paint.alpha = alpha
+        canvas.drawCircle(c, c, r, paint)
+
+        when (state) {
+            State.RECORDING -> drawMicrophone(canvas = canvas, cx = c, cy = c)
+            State.PROCESSING -> {
+                val sweepStart = (t / 900f * 360f) % 360f
+                val o = r + 7 * density
+                canvas.drawArc(RectF(c - o, c - o, c + o, c + o), sweepStart, 110f, false, arcPaint)
+                drawMicrophone(canvas = canvas, cx = c, cy = c)
+            }
+            State.IDLE -> {
+                iconPaint.alpha = alpha
+                strokePaint.alpha = alpha
+                drawMicrophone(canvas = canvas, cx = c, cy = c)
+            }
+        }
     }
 
     fun setState(value: State) {
@@ -375,6 +443,17 @@ class RecordingButton(
                 },
             )
 
+        iconPaint.alpha = 255
+        strokePaint.alpha = 255
+        removeCallbacks(frame)
+        if (value != State.IDLE) {
+            animationStart = SystemClock.uptimeMillis()
+            if (value == State.RECORDING) {
+                runningPeak = 0.05f
+                smoothLevel = 0f
+            }
+            postOnAnimation(frame)
+        }
         invalidate()
     }
 
@@ -441,63 +520,17 @@ class RecordingButton(
         cx: Float,
         cy: Float,
     ) {
-        val microphoneWidth =
-            12 * density
+        // Drawn on a 24-unit grid centred on (12, 12), about 35 dp across.
+        val u = 1.45f * density
 
-        val microphoneHeight =
-            20 * density
+        fun x(v: Float) = cx + (v - 12f) * u
 
-        val left =
-            cx - microphoneWidth / 2
+        fun y(v: Float) = cy + (v - 12f) * u
 
-        val top =
-            cy - microphoneHeight / 2
-
-        val microphoneRect =
-            RectF(
-                left,
-                top,
-                left + microphoneWidth,
-                top + microphoneHeight,
-            )
-
-        canvas.drawRoundRect(
-            microphoneRect,
-            microphoneWidth / 2,
-            microphoneWidth / 2,
-            iconPaint,
-        )
-
-        val arcRect =
-            RectF(
-                cx - 11 * density,
-                cy - 5 * density,
-                cx + 11 * density,
-                cy + 11 * density,
-            )
-
-        canvas.drawArc(
-            arcRect,
-            0f,
-            180f,
-            false,
-            strokePaint,
-        )
-
-        canvas.drawLine(
-            cx,
-            cy + 6 * density,
-            cx,
-            cy + 12 * density,
-            strokePaint,
-        )
-
-        canvas.drawLine(
-            cx - 5 * density,
-            cy + 12 * density,
-            cx + 5 * density,
-            cy + 12 * density,
-            strokePaint,
-        )
+        strokePaint.strokeWidth = 2.2f * u
+        canvas.drawRoundRect(RectF(x(8.5f), y(2.5f), x(15.5f), y(14.5f)), 3.5f * u, 3.5f * u, iconPaint)
+        canvas.drawArc(RectF(x(5f), y(4f), x(19f), y(18f)), 0f, 180f, false, strokePaint)
+        canvas.drawLine(x(12f), y(18f), x(12f), y(21.5f), strokePaint)
+        canvas.drawLine(x(8.5f), y(21.5f), x(15.5f), y(21.5f), strokePaint)
     }
 }
