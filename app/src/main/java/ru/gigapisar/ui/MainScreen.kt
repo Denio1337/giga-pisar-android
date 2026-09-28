@@ -43,6 +43,12 @@ fun MainScreen(activity: ComponentActivity) {
     }
     var microphoneGranted by remember { mutableStateOf(isMicrophonePermissionGranted(context)) }
     val scope = rememberCoroutineScope()
+    val requestMicrophone = {
+        activity.requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), 100)
+    }
+    val openAccessibilitySettings = {
+        activity.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+    }
 
     LaunchedEffect(context) {
         SettingsRepository.insertionMode(context).collect { mode ->
@@ -80,6 +86,17 @@ fun MainScreen(activity: ComponentActivity) {
                     text = context.getString(R.string.app_name),
                     style = MaterialTheme.typography.headlineMedium,
                 )
+                if (!(microphoneGranted && accessibilityEnabled && modelInstalled)) {
+                    SetupWizard(
+                        microphoneGranted = microphoneGranted,
+                        accessibilityEnabled = accessibilityEnabled,
+                        onRequestMicrophone = requestMicrophone,
+                        onOpenAccessibilitySettings = openAccessibilitySettings,
+                        onModelInstalled = { modelInstalled = true },
+                    )
+                    return@Column
+                }
+                ReadyCard()
                 InsertionModeCard(
                     selectedMode = insertionMode,
                     onModeSelected = { mode ->
@@ -100,15 +117,8 @@ fun MainScreen(activity: ComponentActivity) {
                 PermissionsCard(
                     microphoneGranted = microphoneGranted,
                     accessibilityEnabled = accessibilityEnabled,
-                    onRequestMicrophone = {
-                        activity.requestPermissions(
-                            arrayOf(Manifest.permission.RECORD_AUDIO),
-                            100,
-                        )
-                    },
-                    onOpenAccessibilitySettings = {
-                        activity.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
-                    },
+                    onRequestMicrophone = requestMicrophone,
+                    onOpenAccessibilitySettings = openAccessibilitySettings,
                 )
                 ModelCard(
                     modelInstalled = modelInstalled,

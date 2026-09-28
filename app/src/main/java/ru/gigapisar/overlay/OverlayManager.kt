@@ -135,6 +135,11 @@ class OverlayManager(
         }
     }
 
+    /** Half-transparent while the app is not ready (no model yet): a tap then leads to setup. */
+    fun setAvailable(available: Boolean) {
+        button.alpha = if (available) 1f else 0.45f
+    }
+
     fun setIdle() {
         button.setState(
             RecordingButton.State.IDLE,

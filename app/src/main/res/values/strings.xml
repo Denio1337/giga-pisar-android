@@ -44,6 +44,7 @@
     <string name="model_required">Сначала загрузите модель GigaAM</string>
     <string name="microphone_required">Нет разрешения на использование микрофона</string>
     <string name="recording_too_short">Запись слишком короткая</string>
+    <string name="copied_to_clipboard">Текст в буфере обмена</string>
     <string name="transcription_error">Ошибка распознавания: %1$s</string>
     <string name="empty_transcription">Распознавание не вернуло текст</string>
     <string name="paste_failed">Не удалось вставить текст в поле</string>
@@ -53,4 +54,19 @@
     <string name="button_recording">Идёт запись</string>
     <string name="button_processing">Распознавание</string>
 
+    <string name="setup_step">Шаг %1$d из 3</string>
+    <string name="setup_mic_title">Разрешите микрофон</string>
+    <string name="setup_mic_text">Писарь слушает только пока вы держите кнопку. Запись никуда не отправляется, текст распознаётся на телефоне.</string>
+    <string name="setup_mic_button">Разрешить</string>
+    <string name="setup_access_title">Включите Гига Писаря в специальных возможностях</string>
+    <string name="setup_access_text">Так Писарь узнаёт, что вы зажали громкость вниз, и вставляет текст в поле ввода. В списке служб найдите «Гига Писарь» и включите.</string>
+    <string name="setup_access_button">Открыть настройки</string>
+    <string name="setup_access_hint">Если Android пишет «доступ запрещён»: Настройки → Приложения → Гига Писарь → ⋮ → Разрешить ограниченные настройки. Потом включите службу ещё раз.</string>
+    <string name="setup_model_title">Скачайте модель распознавания</string>
+    <string name="setup_model_text">GigaAM, 225 МБ. Скачивается один раз, потом Писарь работает без интернета. Лучше по Wi-Fi.</string>
+    <string name="setup_model_button">Скачать</string>
+    <string name="setup_model_retry">Попробовать ещё раз</string>
+    <string name="ready_title">✓ Всё готово</string>
+    <string name="ready_text">Зажмите громкость вниз в любом поле ввода и говорите. Отпустите, и текст появится.</string>
+    <string name="ready_try_here">Попробуйте здесь…</string>
 </resources>

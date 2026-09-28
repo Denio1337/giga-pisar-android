@@ -3,7 +3,14 @@ package ru.gigapisar.service
 import android.Manifest
 import android.accessibilityservice.AccessibilityService
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Rect
+import android.os.Build
+import android.os.SystemClock
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import android.media.AudioManager
 import android.os.Handler
 import android.os.Looper
@@ -24,7 +31,9 @@ import ru.gigapisar.R
 import ru.gigapisar.audio.AudioRecorder
 import ru.gigapisar.insertion.TextInserter
 import ru.gigapisar.model.ModelManager
+import ru.gigapisar.MainActivity
 import ru.gigapisar.overlay.OverlayManager
+import ru.gigapisar.overlay.RecordingPill
 import ru.gigapisar.settings.InsertionMode
 import ru.gigapisar.settings.SettingsRepository
 import ru.gigapisar.speech.GigaAmOnnxRecognizer
@@ -54,6 +63,13 @@ class GigaPisarAccessibilityService : AccessibilityService() {
 
     private lateinit var overlay:
         OverlayManager
+
+    private lateinit var pill:
+        RecordingPill
+
+    /** Checked at most every few seconds: validating the model reads its files. */
+    private var modelReady = false
+    private var modelCheckedAt = 0L
 
     private var insertionMode =
         InsertionMode.TEXT_FIELD
@@ -103,6 +119,9 @@ class GigaPisarAccessibilityService : AccessibilityService() {
 
         inserter =
             TextInserter(this)
+
+        pill =
+            RecordingPill(this)
 
         overlay =
             OverlayManager(
@@ -234,6 +253,13 @@ class GigaPisarAccessibilityService : AccessibilityService() {
                 )
 
         overlay.setButtonVisible(shouldShow)
+
+        val now = SystemClock.elapsedRealtime()
+        if (now - modelCheckedAt > 3000) {
+            modelCheckedAt = now
+            modelReady = modelManager.isInstalled()
+        }
+        overlay.setAvailable(modelReady)
     }
 
     private fun findFocusedEditable(node: AccessibilityNodeInfo?): AccessibilityNodeInfo? {
@@ -277,7 +303,7 @@ class GigaPisarAccessibilityService : AccessibilityService() {
                 Manifest.permission.RECORD_AUDIO,
             ) != PackageManager.PERMISSION_GRANTED
         ) {
-            showToast(
+            notifyUser(
                 getString(
                     R.string.microphone_required,
                 ),
@@ -288,18 +314,19 @@ class GigaPisarAccessibilityService : AccessibilityService() {
         }
 
         if (!modelManager.isInstalled()) {
-            showToast(
+            notifyUser(
                 getString(
                     R.string.model_required,
                 ),
             )
 
             overlay.setIdle()
+            openAppForSetup()
             return
         }
 
         if (!audioRecorder.start()) {
-            showToast(
+            notifyUser(
                 getString(
                     R.string.audio_record_error,
                 ),
@@ -311,6 +338,8 @@ class GigaPisarAccessibilityService : AccessibilityService() {
 
         recording = true
         overlay.setRecording()
+        pill.showListening(focusedFieldBounds()) { audioRecorder.level }
+        buzz()
     }
 
     private fun handleRecordingStop() {
@@ -322,6 +351,8 @@ class GigaPisarAccessibilityService : AccessibilityService() {
         recording = false
 
         overlay.setProcessing()
+        pill.showProcessing()
+        buzz()
 
         recordingJob?.cancel()
 
@@ -353,7 +384,7 @@ class GigaPisarAccessibilityService : AccessibilityService() {
                         Dispatchers.Main,
                     ) {
                         if (text.isBlank()) {
-                            showToast(
+                            notifyUser(
                                 getString(
                                     R.string.empty_transcription,
                                 ),
@@ -377,16 +408,21 @@ class GigaPisarAccessibilityService : AccessibilityService() {
                                             )
 
                                     if (!success) {
-                                        showToast(
+                                        notifyUser(
                                             getString(
                                                 R.string.paste_failed,
                                             ),
                                         )
+                                    } else {
+                                        pill.hide()
                                     }
                                 }
                             }
                         }
 
+                        if (insertionMode == InsertionMode.CLIPBOARD && text.isNotBlank()) {
+                            notifyUser(getString(R.string.copied_to_clipboard))
+                        }
                         overlay.setIdle()
                     }
                 } catch (error: Throwable) {
@@ -397,7 +433,7 @@ class GigaPisarAccessibilityService : AccessibilityService() {
                             error.message
                                 ?: error.javaClass.simpleName
 
-                        showToast(
+                        notifyUser(
                             getString(
                                 R.string.transcription_error,
                                 message,
@@ -415,6 +451,7 @@ class GigaPisarAccessibilityService : AccessibilityService() {
         recording = false
         audioRecorder.cancel()
         overlay.setIdle()
+        pill.hide()
     }
 
     override fun onDestroy() {
@@ -434,6 +471,52 @@ class GigaPisarAccessibilityService : AccessibilityService() {
         serviceScope.cancel()
 
         super.onDestroy()
+    }
+
+    /** Errors and hints of the recording flow: on the pill, next to where the text goes. */
+    private fun notifyUser(text: String) {
+        mainHandler.post { pill.showMessage(text, focusedFieldBounds()) }
+    }
+
+    private fun focusedFieldBounds(): Rect? =
+        focusedNode?.let { node ->
+            try {
+                Rect().also(node::getBoundsInScreen)
+            } catch (_: Exception) {
+                null
+            }
+        }
+
+    /** A short tick at the start and the end of a recording: dictation without looking at the screen. */
+    private fun buzz() {
+        try {
+            val vibrator =
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    getSystemService(VibratorManager::class.java).defaultVibrator
+                } else {
+                    @Suppress("DEPRECATION")
+                    getSystemService(Vibrator::class.java)
+                }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                vibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_TICK))
+            } else {
+                vibrator.vibrate(VibrationEffect.createOneShot(20, VibrationEffect.DEFAULT_AMPLITUDE))
+            }
+        } catch (_: Exception) {
+            // No vibrator: nothing to do.
+        }
+    }
+
+    /** Opens the app on its setup steps (e.g. the model is missing). */
+    private fun openAppForSetup() {
+        try {
+            startActivity(
+                Intent(this, MainActivity::class.java)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP),
+            )
+        } catch (_: Exception) {
+            // The pill already said what to do.
+        }
     }
 
     private fun showToast(text: String) {
