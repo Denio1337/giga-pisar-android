@@ -83,7 +83,15 @@ private fun StepBar(step: Int) {
     Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
         for (i in 1..3) {
             LinearProgressIndicator(
-                progress = { if (i < step) 1f else if (i == step) 0.5f else 0f },
+                progress = {
+                    if (i < step) {
+                        1f
+                    } else if (i == step) {
+                        0.5f
+                    } else {
+                        0f
+                    }
+                },
                 modifier =
                     Modifier
                         .weight(1f)

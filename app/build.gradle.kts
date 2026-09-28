@@ -74,6 +74,8 @@ android {
         targetSdk = 36
         versionCode = appVersionCode
         versionName = appVersionName
+        // Phones only: x86 builds serve emulators and would double the APK size.
+        ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a") }
     }
 
     if (releaseSigningConfigured) {

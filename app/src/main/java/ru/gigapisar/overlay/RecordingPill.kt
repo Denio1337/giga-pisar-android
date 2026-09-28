@@ -136,10 +136,18 @@ class RecordingPill(
         // The website's wave palette, light green to teal.
         private val palette =
             listOf(
-                0xFFA8E063 to 0xFF1FA03A, 0xFFA8E063 to 0xFF1FA03A, 0xFF9ADF55 to 0xFF17963F,
-                0xFF8AD84C to 0xFF10884A, 0xFF7FD648 to 0xFF0E9367, 0xFF63CF62 to 0xFF009B82,
-                0xFF4FC884 to 0xFF00A08C, 0xFF3FC39B to 0xFF00A08C, 0xFF38BFA5 to 0xFF008F92,
-                0xFF35BCB0 to 0xFF008699, 0xFF35BCB0 to 0xFF008699, 0xFF35BCB0 to 0xFF008699,
+                0xFFA8E063 to 0xFF1FA03A,
+                0xFFA8E063 to 0xFF1FA03A,
+                0xFF9ADF55 to 0xFF17963F,
+                0xFF8AD84C to 0xFF10884A,
+                0xFF7FD648 to 0xFF0E9367,
+                0xFF63CF62 to 0xFF009B82,
+                0xFF4FC884 to 0xFF00A08C,
+                0xFF3FC39B to 0xFF00A08C,
+                0xFF38BFA5 to 0xFF008F92,
+                0xFF35BCB0 to 0xFF008699,
+                0xFF35BCB0 to 0xFF008699,
+                0xFF35BCB0 to 0xFF008699,
                 0xFF35BCB0 to 0xFF008699,
             )
 

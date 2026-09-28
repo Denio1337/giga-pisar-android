@@ -17,8 +17,8 @@ class OverlayManager(
         private const val POSITION_X_KEY = "x"
         private const val POSITION_Y_KEY = "y"
 
-        private const val BUTTON_SIZE_DP = 64
-        private const val EDGE_MARGIN_DP = 12
+        private const val BUTTON_SIZE_DP = 88
+        private const val EDGE_MARGIN_DP = 0
         private const val TOP_MARGIN_DP = 96
     }
 
@@ -137,7 +137,12 @@ class OverlayManager(
 
     /** Half-transparent while the app is not ready (no model yet): a tap then leads to setup. */
     fun setAvailable(available: Boolean) {
-        button.alpha = if (available) 1f else 0.45f
+        button.dimmed = !available
+    }
+
+    /** Microphone level source for the pulse while recording. */
+    fun setLevelSource(level: () -> Float) {
+        button.level = level
     }
 
     fun setIdle() {

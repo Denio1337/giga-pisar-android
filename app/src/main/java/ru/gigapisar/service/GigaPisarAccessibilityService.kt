@@ -6,14 +6,14 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Rect
+import android.media.AudioManager
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.os.SystemClock
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
-import android.media.AudioManager
-import android.os.Handler
-import android.os.Looper
 import android.view.KeyEvent
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
@@ -27,11 +27,11 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import ru.gigapisar.MainActivity
 import ru.gigapisar.R
 import ru.gigapisar.audio.AudioRecorder
 import ru.gigapisar.insertion.TextInserter
 import ru.gigapisar.model.ModelManager
-import ru.gigapisar.MainActivity
 import ru.gigapisar.overlay.OverlayManager
 import ru.gigapisar.overlay.RecordingPill
 import ru.gigapisar.settings.InsertionMode
@@ -337,6 +337,7 @@ class GigaPisarAccessibilityService : AccessibilityService() {
         }
 
         recording = true
+        overlay.setLevelSource { audioRecorder.level }
         overlay.setRecording()
         pill.showListening(focusedFieldBounds()) { audioRecorder.level }
         buzz()
