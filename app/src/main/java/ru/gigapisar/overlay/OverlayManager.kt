@@ -17,7 +17,7 @@ class OverlayManager(
         private const val POSITION_X_KEY = "x"
         private const val POSITION_Y_KEY = "y"
 
-        private const val BUTTON_SIZE_DP = 88
+        private const val BUTTON_SIZE_DP = 120
         private const val EDGE_MARGIN_DP = 0
         private const val TOP_MARGIN_DP = 96
     }

@@ -369,11 +369,12 @@ class GigaPisarAccessibilityService : AccessibilityService() {
                         audio.size <
                         AudioRecorder.SAMPLE_RATE / 5
                     ) {
-                        throw IllegalArgumentException(
-                            getString(
-                                R.string.recording_too_short,
-                            ),
-                        )
+                        // A quick tap is not a mistake worth a message: just go back to idle.
+                        withContext(Dispatchers.Main) {
+                            pill.hide()
+                            overlay.setIdle()
+                        }
+                        return@launch
                     }
 
                     val text =

@@ -28,8 +28,8 @@ class RecordingButton(
 
     companion object {
         // The window is larger than the circle so the pulse rings fit around it.
-        private const val BUTTON_SIZE_DP = 88
-        private const val CIRCLE_RADIUS_DP = 29
+        private const val BUTTON_SIZE_DP = 120
+        private const val CIRCLE_RADIUS_DP = 43
         private const val RING_PERIOD_MS = 1600L
         private const val VISIBILITY_ANIMATION_DURATION = 180L
         private const val PRESSED_SCALE = 0.94f
@@ -385,16 +385,16 @@ class RecordingButton(
             smoothLevel += (loud - smoothLevel) * 0.3f
             effectPaint.style = Paint.Style.FILL
             effectPaint.color = 0x4063CF62
-            canvas.drawCircle(c, c, r * (1.04f + 0.4f * smoothLevel), effectPaint)
+            canvas.drawCircle(c, c, r * (1.04f + 0.3f * smoothLevel), effectPaint)
 
             // Two halos spreading out from the button, brighter while speaking.
             effectPaint.style = Paint.Style.STROKE
-            effectPaint.strokeWidth = 3f * density
+            effectPaint.strokeWidth = 4f * density
             for (k in 0..1) {
                 val p = ((t / RING_PERIOD_MS) + k * 0.5f) % 1f
                 val strength = 0.2f + 0.6f * smoothLevel
                 effectPaint.color = ((strength * (1f - p) * 255).toInt() shl 24) or 0x1FA03A
-                canvas.drawCircle(c, c, r * (1f + 0.48f * p), effectPaint)
+                canvas.drawCircle(c, c, r * (1f + 0.34f * p), effectPaint)
             }
         }
 
@@ -407,7 +407,7 @@ class RecordingButton(
             State.RECORDING -> drawMicrophone(canvas = canvas, cx = c, cy = c)
             State.PROCESSING -> {
                 val sweepStart = (t / 900f * 360f) % 360f
-                val o = r + 5 * density
+                val o = r + 7 * density
                 canvas.drawArc(RectF(c - o, c - o, c + o, c + o), sweepStart, 110f, false, arcPaint)
                 drawMicrophone(canvas = canvas, cx = c, cy = c)
             }
@@ -513,8 +513,8 @@ class RecordingButton(
         cx: Float,
         cy: Float,
     ) {
-        // Drawn on a 24-unit grid centred on (12, 12), about 23 dp across.
-        val u = 0.97f * density
+        // Drawn on a 24-unit grid centred on (12, 12), about 35 dp across.
+        val u = 1.45f * density
 
         fun x(v: Float) = cx + (v - 12f) * u
 
