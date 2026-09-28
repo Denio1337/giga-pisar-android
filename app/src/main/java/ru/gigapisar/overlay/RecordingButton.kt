@@ -31,6 +31,7 @@ class RecordingButton(
         private const val BUTTON_SIZE_DP = 120
         private const val CIRCLE_RADIUS_DP = 43
         private const val RING_PERIOD_MS = 1600L
+        private const val DRAG_WINDOW_MS = 250L
         private const val VISIBILITY_ANIMATION_DURATION = 180L
         private const val PRESSED_SCALE = 0.94f
     }
@@ -234,6 +235,12 @@ class RecordingButton(
              * as a drag.
              */
                 if (!dragging) {
+                    // Once recording is under way the finger may wander: only a quick
+                    // move right after the touch turns the gesture into a drag.
+                    if (event.eventTime - event.downTime > DRAG_WINDOW_MS) {
+                        return true
+                    }
+
                     val distanceExceeded =
                         abs(totalDx) > touchSlop ||
                             abs(totalDy) > touchSlop
