@@ -176,9 +176,11 @@ class GigaPisarAccessibilityService : AccessibilityService() {
                         handleRecordingStop()
                     }
                 } else {
-                    audioManager.adjustStreamVolume(
-                        AudioManager.STREAM_ACCESSIBILITY,
+                    // A short press is an ordinary volume-down: let Android pick the active
+                    // stream (music, call, ring), as it does without us.
+                    audioManager.adjustSuggestedStreamVolume(
                         AudioManager.ADJUST_LOWER,
+                        AudioManager.USE_DEFAULT_STREAM_TYPE,
                         AudioManager.FLAG_SHOW_UI,
                     )
                 }
@@ -453,6 +455,7 @@ class GigaPisarAccessibilityService : AccessibilityService() {
     }
 
     companion object {
-        private const val VOLUME_RECORDING_HOLD_DELAY_MS = 150L
+        // An ordinary tap lasts 100-200 ms; recording starts only on a deliberate hold.
+        private const val VOLUME_RECORDING_HOLD_DELAY_MS = 350L
     }
 }
