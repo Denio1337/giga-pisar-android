@@ -112,4 +112,9 @@
     <string name="brain_status_checking">Проверяю…</string>
     <string name="brain_status_none">Нужен ключ</string>
     <string name="brain_status_none_text">Вставьте ниже ключ API сервиса, например DeepSeek. Ключ хранится зашифрованным только на этом телефоне.</string>
+
+    <string name="brain_done">✓ Мозг поправил</string>
+    <string name="brain_undo">Вернуть</string>
+    <string name="brain_undo_changed">Поле уже изменилось. Исходный текст в буфере обмена</string>
+    <string name="brain_undo_clipboard">Исходный текст в буфере обмена</string>
 </resources>

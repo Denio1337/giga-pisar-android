@@ -4,6 +4,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.os.Build
+import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.view.accessibility.AccessibilityNodeInfo
@@ -29,39 +30,109 @@ class TextInserter(
         )
     }
 
-    fun pasteIntoFocusedField(
+    /** Where a dictation went in: the field and the offset of the text, so it can be swapped back. */
+    class Insertion(
+        val node: AccessibilityNodeInfo,
+        val start: Int,
+    )
+
+    /**
+     * Puts [text] into the focused field at the cursor. First written straight into the field,
+     * without the clipboard: Android then shows no "pasted from clipboard" popup over the
+     * keyboard and whatever the user copied stays in the clipboard. Fields that do not take
+     * text that way (some rich editors, password fields) get the old paste through the clipboard.
+     * Returns null when the text did not go in.
+     */
+    fun insertIntoFocusedField(
         fallbackNode: AccessibilityNodeInfo?,
         text: String,
-    ): Boolean {
-        putToClipboard(text)
-
-        val node = findFocusedNode() ?: fallbackNode
-
-        node ?: return false
-
+    ): Insertion? {
+        val node = findFocusedNode() ?: fallbackNode ?: return null
         return try {
-            if (node.isEditable &&
-                node.isEnabled
-            ) {
-                val pasted =
-                    node.performAction(
-                        AccessibilityNodeInfo.ACTION_PASTE,
-                    )
+            if (!node.isEditable || !node.isEnabled) return null
+            insertDirectly(node, text) ?: paste(node, text)
+        } catch (_: Throwable) {
+            null
+        }
+    }
 
-                if (pasted) {
-                    mainHandler.postDelayed(
-                        ::clearClipboard,
-                        CLIPBOARD_CLEAR_DELAY_MS,
-                    )
+    /**
+     * Swaps [inserted] at [insertion] back to [original]. False when the field changed since
+     * (the user typed, or left the app): then nothing is touched blindly.
+     */
+    fun replaceInserted(
+        insertion: Insertion,
+        inserted: String,
+        original: String,
+    ): Boolean =
+        try {
+            val node = insertion.node
+            if (!node.refresh()) return false
+            val current = fieldText(node)
+            val at =
+                if (current.startsWith(inserted, insertion.start)) {
+                    insertion.start
+                } else {
+                    // The app may have shifted the text a little (e.g. trimmed a space); accept one clear match.
+                    current.indexOf(inserted).takeIf { it >= 0 && it == current.lastIndexOf(inserted) } ?: return false
                 }
-
-                pasted
-            } else {
-                false
-            }
+            setText(node, current.substring(0, at) + original + current.substring(at + inserted.length), at + original.length)
         } catch (_: Throwable) {
             false
         }
+
+    private fun insertDirectly(
+        node: AccessibilityNodeInfo,
+        text: String,
+    ): Insertion? {
+        // Only plain input fields: there the text we read is the whole text, so writing it back
+        // loses nothing. Anything else (web editors, custom views) goes through paste.
+        if (node.isPassword || node.className?.toString() != "android.widget.EditText") return null
+        val current = fieldText(node)
+        val selStart = node.textSelectionStart
+        val selEnd = node.textSelectionEnd
+        val start = if (selStart in 0..current.length) selStart else current.length
+        val end = if (selEnd in start..current.length) selEnd else start
+        val updated = current.substring(0, start) + text + current.substring(end)
+        if (!setText(node, updated, start + text.length)) return null
+        // Some apps accept the action but ignore it: only count it when the field really holds the text.
+        node.refresh()
+        return if (fieldText(node).startsWith(text, start)) Insertion(node, start) else null
+    }
+
+    private fun paste(
+        node: AccessibilityNodeInfo,
+        text: String,
+    ): Insertion? {
+        val current = fieldText(node)
+        val selStart = node.textSelectionStart
+        val start = if (selStart in 0..current.length) selStart else current.length
+        putToClipboard(text)
+        if (!node.performAction(AccessibilityNodeInfo.ACTION_PASTE)) return null
+        mainHandler.postDelayed(::clearClipboard, CLIPBOARD_CLEAR_DELAY_MS)
+        return Insertion(node, start)
+    }
+
+    /** The field's own text; empty while it only shows its hint ("Сообщение", "Поиск"). */
+    private fun fieldText(node: AccessibilityNodeInfo): String {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && node.isShowingHintText) return ""
+        return node.text?.toString() ?: ""
+    }
+
+    private fun setText(
+        node: AccessibilityNodeInfo,
+        text: String,
+        cursor: Int,
+    ): Boolean {
+        val args = Bundle().apply { putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, text) }
+        if (!node.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)) return false
+        val selection =
+            Bundle().apply {
+                putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_START_INT, cursor)
+                putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_END_INT, cursor)
+            }
+        node.performAction(AccessibilityNodeInfo.ACTION_SET_SELECTION, selection)
+        return true
     }
 
     private fun clearClipboard() {
