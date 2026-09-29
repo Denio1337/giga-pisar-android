@@ -46,7 +46,11 @@ class GigaPisarAccessibilityService : AccessibilityService() {
         )
 
     private val audioRecorder =
-        AudioRecorder()
+        AudioRecorder(
+            onTimeout = {
+                handleRecordingStop()
+            },
+        )
 
     private val audioManager: AudioManager by lazy {
         getSystemService(Context.AUDIO_SERVICE) as AudioManager
@@ -230,17 +234,12 @@ class GigaPisarAccessibilityService : AccessibilityService() {
     }
 
     private fun updateFocusedNode(event: AccessibilityEvent? = null) {
-        val node =
-            findFocusedEditable(event?.source)
-                ?: findFocusedEditable(rootInActiveWindow)
+        val node = findFocusedEditable(event)
 
-        if (node == null) {
-            focusedNode = null
-            updateButtonVisibility()
-            return
+        if (focusedNode != node) {
+            recycleNode(focusedNode)
+            focusedNode = node
         }
-
-        focusedNode = node
         updateButtonVisibility()
     }
 
@@ -262,34 +261,36 @@ class GigaPisarAccessibilityService : AccessibilityService() {
         overlay.setAvailable(modelReady)
     }
 
-    private fun findFocusedEditable(node: AccessibilityNodeInfo?): AccessibilityNodeInfo? {
-        node ?: return null
-
-        if (
-            node.isEditable &&
-            node.isEnabled &&
-            node.isFocused
-        ) {
-            return node
+    private fun findFocusedEditable(event: AccessibilityEvent? = null): AccessibilityNodeInfo? {
+        val eventSource = event?.source
+        if (eventSource != null && eventSource.isEditable && eventSource.isEnabled && eventSource.isFocused) {
+            return eventSource
         }
 
-        for (i in 0 until node.childCount) {
-            val child =
-                try {
-                    node.getChild(i)
-                } catch (_: Throwable) {
-                    null
-                } ?: continue
+        return try {
+            val focused =
+                findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
+                    ?: rootInActiveWindow?.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
 
-            val result =
-                findFocusedEditable(child)
+            if (focused != null && focused.isEditable && focused.isEnabled) {
+                focused
+            } else {
+                null
+            }
+        } catch (_: Throwable) {
+            null
+        }
+    }
 
-            if (result != null) {
-                return result
+    @Suppress("DEPRECATION")
+    private fun recycleNode(node: AccessibilityNodeInfo?) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            try {
+                node?.recycle()
+            } catch (_: Throwable) {
+                // Ignore already recycled
             }
         }
-
-        return null
     }
 
     private fun handleRecordingStart() {
@@ -464,6 +465,7 @@ class GigaPisarAccessibilityService : AccessibilityService() {
 
         recordingJob?.cancel()
 
+        recycleNode(focusedNode)
         focusedNode = null
 
         overlay.remove()

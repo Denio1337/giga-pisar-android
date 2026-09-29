@@ -2,6 +2,8 @@ package ru.gigapisar.model
 
 import android.content.Context
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import java.io.BufferedInputStream
 import java.io.File
@@ -39,30 +41,32 @@ class ModelManager(
                 ModelConfig.READY_FILE_NAME,
             )
 
+    @Volatile
+    private var isInstalledCached: Boolean? = null
+
     fun isInstalled(): Boolean {
-        return try {
-            if (!readyFile.exists()) {
-                return false
+        isInstalledCached?.let { return it }
+
+        val installed =
+            try {
+                readyFile.exists() &&
+                    modelFile.exists() &&
+                    vocabFile.exists() &&
+                    modelFile.length() == ModelConfig.EXPECTED_MODEL_SIZE
+            } catch (_: Throwable) {
+                false
             }
 
-            if (!modelFile.exists() || !vocabFile.exists()) {
-                return false
-            }
-
-            if (modelFile.length() != ModelConfig.EXPECTED_MODEL_SIZE) {
-                return false
-            }
-
-            validateVocabulary()
-
-            true
-        } catch (_: Throwable) {
-            false
+        if (installed) {
+            isInstalledCached = true
         }
+
+        return installed
     }
 
     suspend fun download(onProgress: suspend (Int) -> Unit) {
         withContext(Dispatchers.IO) {
+            isInstalledCached = null
             modelDirectory.mkdirs()
 
             // Old installation marker must never survive a failed update.
@@ -115,7 +119,9 @@ class ModelManager(
                 validateVocabulary()
 
                 readyFile.writeText("ok")
+                isInstalledCached = true
             } catch (error: Throwable) {
+                isInstalledCached = false
                 readyFile.delete()
                 modelFile.delete()
                 vocabFile.delete()
@@ -217,6 +223,8 @@ class ModelManager(
                     var lastProgress = -1
 
                     while (true) {
+                        currentCoroutineContext().ensureActive()
+
                         val count =
                             input.read(buffer)
 
