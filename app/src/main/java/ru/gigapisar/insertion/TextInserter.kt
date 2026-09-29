@@ -3,6 +3,7 @@ package ru.gigapisar.insertion
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.view.accessibility.AccessibilityNodeInfo
@@ -34,16 +35,7 @@ class TextInserter(
     ): Boolean {
         putToClipboard(text)
 
-        val root =
-            findRootNode()
-
-        val focused =
-            root?.let {
-                findFocusedEditable(it)
-            }
-
-        val node =
-            focused ?: fallbackNode
+        val node = findFocusedNode() ?: fallbackNode
 
         node ?: return false
 
@@ -73,53 +65,30 @@ class TextInserter(
     }
 
     private fun clearClipboard() {
-        val clipboard =
-            context.getSystemService(
-                Context.CLIPBOARD_SERVICE,
-            ) as ClipboardManager
-
-        clipboard.clearPrimaryClip()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            clipboard.clearPrimaryClip()
+        }
     }
 
     private companion object {
         const val CLIPBOARD_CLEAR_DELAY_MS = 250L
     }
 
-    private fun findRootNode(): AccessibilityNodeInfo? =
-        try {
-            val service =
-                context as? android.accessibilityservice.AccessibilityService
+    private fun findFocusedNode(): AccessibilityNodeInfo? {
+        val service = context as? android.accessibilityservice.AccessibilityService ?: return null
+        return try {
+            val focused =
+                service.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
+                    ?: service.rootInActiveWindow?.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
 
-            service?.rootInActiveWindow
+            if (focused != null && focused.isEditable && focused.isEnabled) {
+                focused
+            } else {
+                null
+            }
         } catch (_: Throwable) {
             null
         }
-
-    private fun findFocusedEditable(node: AccessibilityNodeInfo): AccessibilityNodeInfo? {
-        if (
-            node.isEditable &&
-            node.isEnabled &&
-            node.isFocused
-        ) {
-            return node
-        }
-
-        for (i in 0 until node.childCount) {
-            val child =
-                try {
-                    node.getChild(i)
-                } catch (_: Throwable) {
-                    null
-                } ?: continue
-
-            val result =
-                findFocusedEditable(child)
-
-            if (result != null) {
-                return result
-            }
-        }
-
-        return null
     }
 }

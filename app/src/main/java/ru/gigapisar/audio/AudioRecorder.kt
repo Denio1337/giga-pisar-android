@@ -3,11 +3,15 @@ package ru.gigapisar.audio
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
+import android.os.Handler
+import android.os.Looper
 import android.os.SystemClock
 import java.io.ByteArrayOutputStream
 import kotlin.concurrent.thread
 
-class AudioRecorder {
+class AudioRecorder(
+    var onTimeout: (() -> Unit)? = null,
+) {
     companion object {
         const val SAMPLE_RATE = 16_000
         private const val MAX_DURATION_MS = 25_000L
@@ -129,6 +133,9 @@ class AudioRecorder {
                     SystemClock.elapsedRealtime() -
                     startedAt >= MAX_DURATION_MS
                 ) {
+                    onTimeout?.let { callback ->
+                        Handler(Looper.getMainLooper()).post(callback)
+                    }
                     break
                 }
 
@@ -260,7 +267,7 @@ class AudioRecorder {
         }
 
         try {
-            thread.join()
+            thread.join(500L)
         } catch (_: InterruptedException) {
             Thread.currentThread().interrupt()
         }

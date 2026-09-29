@@ -271,41 +271,57 @@ class GigaAmOnnxRecognizer(
                 ).toFloat()
             }
 
-        private val cosTable =
-            FloatArray(
-                N_FREQS * N_FFT,
-            )
+        private val bitReversal64 =
+            IntArray(64) { i ->
+                var rev = 0
+                var temp = i
+                for (b in 0 until 6) {
+                    rev = (rev shl 1) or (temp and 1)
+                    temp = temp shr 1
+                }
+                rev
+            }
 
-        private val sinTable =
-            FloatArray(
-                N_FREQS * N_FFT,
-            )
+        private val cos5 =
+            FloatArray(25) { idx ->
+                val k1 = idx / 5
+                val n1 = idx % 5
+                cos(2.0 * PI * n1 * k1 / 5.0).toFloat()
+            }
+
+        private val sin5 =
+            FloatArray(25) { idx ->
+                val k1 = idx / 5
+                val n1 = idx % 5
+                (-sin(2.0 * PI * n1 * k1 / 5.0)).toFloat()
+            }
+
+        private val cosTwiddle =
+            FloatArray(5 * 64) { idx ->
+                val k1 = idx / 64
+                val n2 = idx % 64
+                cos(2.0 * PI * n2 * k1 / 320.0).toFloat()
+            }
+
+        private val sinTwiddle =
+            FloatArray(5 * 64) { idx ->
+                val k1 = idx / 64
+                val n2 = idx % 64
+                (-sin(2.0 * PI * n2 * k1 / 320.0)).toFloat()
+            }
+
+        private val cosFft64 =
+            FloatArray(32) { j ->
+                cos(-2.0 * PI * j / 64.0).toFloat()
+            }
+
+        private val sinFft64 =
+            FloatArray(32) { j ->
+                sin(-2.0 * PI * j / 64.0).toFloat()
+            }
 
         private val melFilters =
             createMelFilters()
-
-        init {
-            for (k in 0 until N_FREQS) {
-                for (n in 0 until N_FFT) {
-
-                    val angle =
-                        2.0 *
-                            PI *
-                            k *
-                            n /
-                            N_FFT
-
-                    val index =
-                        k * N_FFT + n
-
-                    cosTable[index] =
-                        cos(angle).toFloat()
-
-                    sinTable[index] =
-                        sin(angle).toFloat()
-                }
-            }
-        }
 
         data class Result(
             val features: FloatArray,
@@ -349,44 +365,90 @@ class GigaAmOnnxRecognizer(
             val power =
                 FloatArray(N_FREQS)
 
+            val x = FloatArray(WIN_LENGTH)
+            val re64 = FloatArray(64)
+            val im64 = FloatArray(64)
+
             for (frame in 0 until frameCount) {
                 val start =
                     frame * HOP_LENGTH
 
-                for (k in 0 until N_FREQS) {
-                    var real = 0.0
-                    var imag = 0.0
+                for (n in 0 until WIN_LENGTH) {
+                    x[n] =
+                        (
+                            pcm[start + n]
+                                .toFloat() /
+                                32768.0f
+                        ) *
+                        window[n]
+                }
 
-                    val tableStart =
-                        k * N_FFT
+                for (k1 in 0 until 5) {
+                    val k1Offset = k1 * 64
+                    val k1FiveOffset = k1 * 5
 
-                    for (n in 0 until N_FFT) {
-                        val sample =
-                            (
-                                pcm[start + n]
-                                    .toFloat() /
-                                    32768.0f
-                            ) *
-                                window[n]
+                    for (n2 in 0 until 64) {
+                        var zReal = 0f
+                        var zImag = 0f
+                        for (n1 in 0 until 5) {
+                            val sample = x[n1 * 64 + n2]
+                            val idx5 = k1FiveOffset + n1
+                            zReal += sample * cos5[idx5]
+                            zImag += sample * sin5[idx5]
+                        }
+                        val twIdx = k1Offset + n2
+                        val cTw = cosTwiddle[twIdx]
+                        val sTw = sinTwiddle[twIdx]
 
-                        real +=
-                            sample *
-                            cosTable[
-                                tableStart + n,
-                            ]
-
-                        imag -=
-                            sample *
-                            sinTable[
-                                tableStart + n,
-                            ]
+                        re64[n2] = zReal * cTw - zImag * sTw
+                        im64[n2] = zReal * sTw + zImag * cTw
                     }
 
-                    power[k] =
-                        (
-                            real * real +
-                                imag * imag
-                        ).toFloat()
+                    for (i in 0 until 64) {
+                        val j = bitReversal64[i]
+                        if (i < j) {
+                            val tr = re64[i]
+                            re64[i] = re64[j]
+                            re64[j] = tr
+
+                            val ti = im64[i]
+                            im64[i] = im64[j]
+                            im64[j] = ti
+                        }
+                    }
+
+                    var len = 2
+                    while (len <= 64) {
+                        val half = len shr 1
+                        val step = 64 / len
+                        for (i in 0 until 64 step len) {
+                            for (j in 0 until half) {
+                                val tableIdx = j * step
+                                val wr = cosFft64[tableIdx]
+                                val wi = sinFft64[tableIdx]
+                                val idx = i + j + half
+
+                                val tr = wr * re64[idx] - wi * im64[idx]
+                                val ti = wr * im64[idx] + wi * re64[idx]
+
+                                re64[idx] = re64[i + j] - tr
+                                im64[idx] = im64[i + j] - ti
+
+                                re64[i + j] += tr
+                                im64[i + j] += ti
+                            }
+                        }
+                        len = len shl 1
+                    }
+
+                    for (k2 in 0..32) {
+                        val k = k1 + 5 * k2
+                        if (k < N_FREQS) {
+                            val rK = re64[k2]
+                            val iK = im64[k2]
+                            power[k] = rK * rK + iK * iK
+                        }
+                    }
                 }
 
                 for (mel in 0 until N_MELS) {
