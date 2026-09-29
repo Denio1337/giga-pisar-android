@@ -91,7 +91,10 @@ class TextInserter(
         val current = fieldText(node)
         val selStart = node.textSelectionStart
         val selEnd = node.textSelectionEnd
-        val start = if (selStart in 0..current.length) selStart else current.length
+        // A focused plain field always knows its cursor. When it does not say, what we read
+        // may not be its real text (a hint drawn by the app, say): leave it to paste.
+        if (selStart !in 0..current.length) return null
+        val start = selStart
         val end = if (selEnd in start..current.length) selEnd else start
         val updated = current.substring(0, start) + text + current.substring(end)
         if (!setText(node, updated, start + text.length)) return null
@@ -115,8 +118,15 @@ class TextInserter(
 
     /** The field's own text; empty while it only shows its hint ("Сообщение", "Поиск"). */
     private fun fieldText(node: AccessibilityNodeInfo): String {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && node.isShowingHintText) return ""
-        return node.text?.toString() ?: ""
+        val text = node.text?.toString() ?: ""
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            if (node.isShowingHintText) return ""
+            // Telegram and others report the grey hint ("Message") as the text of an empty
+            // field without flagging it; taken for real text, it ended up before the dictation.
+            val hint = node.hintText?.toString()
+            if (!hint.isNullOrEmpty() && text == hint) return ""
+        }
+        return text
     }
 
     private fun setText(
