@@ -18,7 +18,6 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 import kotlin.math.sin
-import kotlin.math.sqrt
 
 /**
  * The recording pill, as on the desktop apps: a small capsule with a wave that follows
@@ -173,7 +172,6 @@ class RecordingPill(
         private var level: () -> Float = { 0f }
         private var text = ""
         private val heights = FloatArray(barCount)
-        private var runningPeak = 0.05f
         private var phase = 0f
 
         private val frame =
@@ -198,7 +196,6 @@ class RecordingPill(
             this.level = level
             mode = Mode.LISTENING
             heights.fill(0f)
-            runningPeak = 0.05f
             restart()
         }
 
@@ -229,10 +226,9 @@ class RecordingPill(
 
         private fun tick() {
             if (mode == Mode.LISTENING) {
-                // Adaptive scale: a quiet microphone still moves the wave, a loud one does not clip it.
+                // Level is already on the dB scale (0..1), see AudioRecorder.levelOf.
                 val raw = level()
-                runningPeak = max(raw, runningPeak * 0.995f).coerceAtLeast(0.02f)
-                val loud = sqrt((raw / runningPeak).coerceIn(0f, 1f))
+                val loud = raw.coerceIn(0f, 1f)
                 for (i in 0 until barCount) {
                     val centre = 1f - kotlin.math.abs(i - (barCount - 1) / 2f) / barCount
                     val jitter = 0.75f + 0.5f * Math.random().toFloat()

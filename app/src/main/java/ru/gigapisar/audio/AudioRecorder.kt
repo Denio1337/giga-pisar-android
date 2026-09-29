@@ -8,6 +8,11 @@ import android.os.Looper
 import android.os.SystemClock
 import java.io.ByteArrayOutputStream
 import kotlin.concurrent.thread
+import kotlin.math.log10
+import kotlin.math.max
+import kotlin.math.min
+import kotlin.math.pow
+import kotlin.math.sqrt
 
 class AudioRecorder(
     var onTimeout: (() -> Unit)? = null,
@@ -21,6 +26,16 @@ class AudioRecorder(
 
         private const val AUDIO_FORMAT =
             AudioFormat.ENCODING_PCM_16BIT
+
+        /** 20 ms of 16-bit mono audio. */
+        private const val READ_CHUNK_BYTES = SAMPLE_RATE / 50 * 2
+
+        // Wave scale in dB below full scale: a quiet room sits near -55, speech peaks at -35..-12.
+        private const val DB_FLOOR = -50.0
+        private const val DB_CEIL = -15.0
+
+        // Lifts the middle so ordinary speech does not hang in the lower third.
+        private const val LEVEL_CURVE = 0.6
     }
 
     private val lock = Any()
@@ -33,8 +48,9 @@ class AudioRecorder(
     private var recording = false
 
     /**
-     * Loudness of the latest audio chunk, 0..1 (peak of the chunk). The recording pill
-     * reads it every frame to draw the wave; it is 0 when nothing is being recorded.
+     * Loudness of the latest 20 ms chunk, 0..1 on the same dB scale as the Mac app. The
+     * recording pill and the floating button read it every frame; it is 0 when nothing
+     * is being recorded.
      */
     @Volatile
     var level: Float = 0f
@@ -124,7 +140,9 @@ class AudioRecorder(
         record: AudioRecord,
         bufferSize: Int,
     ) {
-        val buffer = ByteArray(bufferSize)
+        // The system buffer stays large; we read it in 20 ms steps so the wave keeps up with
+        // the voice. One read of the whole buffer is a quarter of a second, and the wave lagged.
+        val buffer = ByteArray(min(bufferSize, READ_CHUNK_BYTES))
         val startedAt = SystemClock.elapsedRealtime()
 
         try {
@@ -156,7 +174,7 @@ class AudioRecorder(
                                 count,
                             )
                         }
-                        level = peakOf(buffer, count)
+                        level = levelOf(buffer, count)
                     }
 
                     count == AudioRecord.ERROR_DEAD_OBJECT -> {
@@ -178,20 +196,34 @@ class AudioRecorder(
         }
     }
 
-    /** Peak of little-endian 16-bit PCM, scaled to 0..1. */
-    private fun peakOf(
+    /**
+     * Loudness of little-endian 16-bit PCM for the wave: the loudest 10 ms window, in dB,
+     * mapped so a quiet room lies flat and ordinary speech fills most of the height. The
+     * same floor, ceiling and curve as the Mac app.
+     */
+    private fun levelOf(
         bytes: ByteArray,
         count: Int,
     ): Float {
-        var peak = 0
-        var i = 0
-        while (i + 1 < count) {
-            val sample = (bytes[i].toInt() and 0xFF) or (bytes[i + 1].toInt() shl 8)
-            val magnitude = if (sample < 0) -sample else sample
-            if (magnitude > peak) peak = magnitude
-            i += 2
+        val samples = count / 2
+        if (samples == 0) return 0f
+        val window = SAMPLE_RATE / 100
+        var loudest = 0.0
+        var start = 0
+        while (start < samples) {
+            val end = min(start + window, samples)
+            var sum = 0.0
+            for (n in start until end) {
+                val i = n * 2
+                val sample = ((bytes[i].toInt() and 0xFF) or (bytes[i + 1].toInt() shl 8)) / 32768.0
+                sum += sample * sample
+            }
+            loudest = max(loudest, sqrt(sum / (end - start)))
+            start = end
         }
-        return (peak / 32768f).coerceIn(0f, 1f)
+        val db = 20 * log10(max(loudest, 1e-7))
+        val norm = ((db - DB_FLOOR) / (DB_CEIL - DB_FLOOR)).coerceIn(0.0, 1.0)
+        return norm.pow(LEVEL_CURVE).toFloat()
     }
 
     fun stop(): ShortArray {
