@@ -11,6 +11,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
+import android.os.VibrationAttributes
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
@@ -496,15 +497,53 @@ class GigaPisarAccessibilityService : AccessibilityService() {
         try {
             val vibrator =
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    getSystemService(VibratorManager::class.java).defaultVibrator
+                    val manager = getSystemService(VibratorManager::class.java)
+                    manager?.defaultVibrator ?: getSystemService(Vibrator::class.java)
                 } else {
                     @Suppress("DEPRECATION")
                     getSystemService(Vibrator::class.java)
+                } ?: return
+
+            if (!vibrator.hasVibrator()) return
+
+            val attributes =
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    VibrationAttributes.createForUsage(VibrationAttributes.USAGE_ACCESSIBILITY)
+                } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    VibrationAttributes
+                        .Builder()
+                        .setUsage(VibrationAttributes.USAGE_ACCESSIBILITY)
+                        .build()
+                } else {
+                    null
                 }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                vibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_TICK))
+
+            val effect =
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    when {
+                        vibrator.areAllEffectsSupported(VibrationEffect.EFFECT_CLICK) ==
+                            Vibrator.VIBRATION_EFFECT_SUPPORT_YES -> {
+                            VibrationEffect.createPredefined(VibrationEffect.EFFECT_CLICK)
+                        }
+
+                        vibrator.areAllEffectsSupported(VibrationEffect.EFFECT_TICK) ==
+                            Vibrator.VIBRATION_EFFECT_SUPPORT_YES -> {
+                            VibrationEffect.createPredefined(VibrationEffect.EFFECT_TICK)
+                        }
+
+                        else -> {
+                            VibrationEffect.createOneShot(30L, VibrationEffect.DEFAULT_AMPLITUDE)
+                        }
+                    }
+                } else {
+                    @Suppress("DEPRECATION")
+                    VibrationEffect.createOneShot(30L, VibrationEffect.DEFAULT_AMPLITUDE)
+                }
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && attributes != null) {
+                vibrator.vibrate(effect, attributes)
             } else {
-                vibrator.vibrate(VibrationEffect.createOneShot(20, VibrationEffect.DEFAULT_AMPLITUDE))
+                vibrator.vibrate(effect)
             }
         } catch (_: Exception) {
             // No vibrator: nothing to do.
