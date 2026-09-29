@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import kotlinx.coroutines.launch
 import ru.gigapisar.R
+import ru.gigapisar.brain.KeyVault
 import ru.gigapisar.model.ModelManager
 import ru.gigapisar.settings.InsertionMode
 import ru.gigapisar.settings.SettingsRepository
@@ -44,6 +45,8 @@ fun MainScreen(activity: ComponentActivity) {
     var virtualButtonVisible by remember { mutableStateOf(true) }
     var volumeKeyEnabled by remember { mutableStateOf(true) }
     var vibrationEnabled by remember { mutableStateOf(true) }
+    var brain by remember { mutableStateOf(SettingsRepository.BrainSettings()) }
+    var brainKeySaved by remember { mutableStateOf(KeyVault.load(context) != null) }
     var modelInstalled by remember { mutableStateOf(ModelManager(context).isInstalled()) }
     var accessibilityEnabled by remember {
         mutableStateOf(isAccessibilityServiceEnabled(context))
@@ -74,6 +77,9 @@ fun MainScreen(activity: ComponentActivity) {
     }
     LaunchedEffect(context) {
         SettingsRepository.vibrationEnabled(context).collect { vibrationEnabled = it }
+    }
+    LaunchedEffect(context) {
+        SettingsRepository.brain(context).collect { brain = it }
     }
 
     LifecycleResumeEffect(context) {
@@ -127,6 +133,13 @@ fun MainScreen(activity: ComponentActivity) {
                     onVibration = { scope.launch { SettingsRepository.setVibrationEnabled(context, it) } },
                     onRequestMicrophone = requestMicrophone,
                     onOpenAccessibilitySettings = openAccessibilitySettings,
+                    brainSection = {
+                        BrainSection(
+                            brain = brain,
+                            keySaved = brainKeySaved,
+                            onKeyChanged = { brainKeySaved = KeyVault.load(context) != null },
+                        )
+                    },
                 )
             }
         }

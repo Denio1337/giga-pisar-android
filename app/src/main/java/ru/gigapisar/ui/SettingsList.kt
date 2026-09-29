@@ -56,6 +56,7 @@ internal fun SettingsList(
     onVibration: (Boolean) -> Unit,
     onRequestMicrophone: () -> Unit,
     onOpenAccessibilitySettings: () -> Unit,
+    brainSection: @Composable () -> Unit = {},
 ) {
     val context = LocalContext.current
     Column {
@@ -102,6 +103,8 @@ internal fun SettingsList(
             selected = insertionMode == InsertionMode.CLIPBOARD,
             onClick = { onInsertionMode(InsertionMode.CLIPBOARD) },
         )
+
+        brainSection()
 
         SectionTitle(R.string.section_permissions)
         StatusRow(
@@ -151,7 +154,7 @@ internal fun SettingsList(
 }
 
 @Composable
-private fun SectionTitle(text: Int) {
+internal fun SectionTitle(text: Int) {
     Text(
         text = stringResource(text),
         style = MaterialTheme.typography.titleSmall,

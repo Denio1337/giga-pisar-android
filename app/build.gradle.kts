@@ -7,8 +7,8 @@ plugins {
     id("com.diffplug.spotless")
 }
 
-val appVersionName = "0.1.6"
-val appVersionCode = 7
+val appVersionName = "0.2.0"
+val appVersionCode = 8
 
 val localProperties =
     Properties().apply {
@@ -181,4 +181,6 @@ dependencies {
 
     implementation("androidx.datastore:datastore-preferences:1.2.1")
     implementation("com.microsoft.onnxruntime:onnxruntime-android:1.30.0")
+
+    testImplementation(libs.junit)
 }

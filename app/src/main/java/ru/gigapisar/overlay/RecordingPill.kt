@@ -11,11 +11,13 @@ import android.graphics.Rect
 import android.graphics.RectF
 import android.graphics.Shader
 import android.graphics.Typeface
+import android.text.StaticLayout
+import android.text.TextPaint
+import android.text.TextUtils
 import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
 import kotlin.math.max
-import kotlin.math.min
 import kotlin.math.roundToInt
 import kotlin.math.sin
 
@@ -161,7 +163,7 @@ class RecordingPill(
                 color = if (dark) 0x33FFFFFF else 0x1F000000
             }
         private val textPaint =
-            Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
                 textSize = 13 * resources.displayMetrics.scaledDensity
                 typeface = Typeface.DEFAULT
                 color = if (dark) 0xE6FFFFFF.toInt() else 0xD9000000.toInt()
@@ -171,6 +173,8 @@ class RecordingPill(
         private var mode = Mode.IDLE
         private var level: () -> Float = { 0f }
         private var text = ""
+        private var textLayout: StaticLayout? = null
+        private val textPadV = 7 * density
         private val heights = FloatArray(barCount)
         private var phase = 0f
 
@@ -186,11 +190,21 @@ class RecordingPill(
 
         fun pillWidth(): Int =
             when (mode) {
-                Mode.MESSAGE -> (2 * padding + min(textPaint.measureText(text), resources.displayMetrics.widthPixels * 0.8f)).roundToInt()
+                Mode.MESSAGE -> (2 * padding + messageWidth()).roundToInt()
                 else -> (2 * padding + barsWidth).roundToInt()
             }
 
-        fun pillHeight(): Int = height.roundToInt()
+        fun pillHeight(): Int =
+            if (mode == Mode.MESSAGE) {
+                max(height, (textLayout?.height ?: 0) + 2 * textPadV).roundToInt()
+            } else {
+                height.roundToInt()
+            }
+
+        private fun messageWidth(): Float {
+            val layout = textLayout ?: return 0f
+            return (0 until layout.lineCount).maxOfOrNull { layout.getLineWidth(it) } ?: 0f
+        }
 
         fun listen(level: () -> Float) {
             this.level = level
@@ -208,6 +222,14 @@ class RecordingPill(
         fun message(text: String) {
             removeCallbacks(frame)
             this.text = text
+            // Long reasons (the Brain's especially) wrap onto a few lines instead of being cut.
+            val maxWidth = (resources.displayMetrics.widthPixels * 0.8f - 2 * padding).roundToInt()
+            textLayout =
+                StaticLayout.Builder
+                    .obtain(text, 0, text.length, textPaint, maxWidth)
+                    .setMaxLines(4)
+                    .setEllipsize(TextUtils.TruncateAt.END)
+                    .build()
             mode = Mode.MESSAGE
             requestLayout()
             invalidate()
@@ -254,13 +276,17 @@ class RecordingPill(
         override fun onDraw(canvas: Canvas) {
             if (mode == Mode.IDLE) return
             val w = pillWidth().toFloat()
-            val r = RectF(1f, 1f, w + 1f, height + 1f)
-            canvas.drawRoundRect(r, height / 2, height / 2, background)
-            canvas.drawRoundRect(r, height / 2, height / 2, border)
+            val h = pillHeight().toFloat()
+            val r = RectF(1f, 1f, w + 1f, h + 1f)
+            val radius = height / 2
+            canvas.drawRoundRect(r, radius, radius, background)
+            canvas.drawRoundRect(r, radius, radius, border)
             if (mode == Mode.MESSAGE) {
-                val y = r.centerY() - (textPaint.descent() + textPaint.ascent()) / 2
-                val shown = TextUtilsCompat.ellipsize(text, textPaint, w - 2 * padding)
-                canvas.drawText(shown, r.left + padding, y, textPaint)
+                val layout = textLayout ?: return
+                canvas.save()
+                canvas.translate(r.left + padding, r.centerY() - layout.height / 2f)
+                layout.draw(canvas)
+                canvas.restore()
                 return
             }
             var x = r.left + padding
@@ -272,19 +298,6 @@ class RecordingPill(
                 canvas.drawRoundRect(RectF(x, top, x + barWidth, top + h), barWidth / 2, barWidth / 2, barPaint)
                 x += barWidth + barGap
             }
-        }
-    }
-
-    private object TextUtilsCompat {
-        fun ellipsize(
-            text: String,
-            paint: Paint,
-            width: Float,
-        ): String {
-            if (paint.measureText(text) <= width) return text
-            var end = text.length
-            while (end > 0 && paint.measureText(text, 0, end) + paint.measureText("…") > width) end--
-            return text.substring(0, end) + "…"
         }
     }
 }

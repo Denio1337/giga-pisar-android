@@ -31,6 +31,10 @@ import kotlinx.coroutines.withContext
 import ru.gigapisar.MainActivity
 import ru.gigapisar.R
 import ru.gigapisar.audio.AudioRecorder
+import ru.gigapisar.brain.Brain
+import ru.gigapisar.brain.BrainException
+import ru.gigapisar.brain.BrainProviders
+import ru.gigapisar.brain.KeyVault
 import ru.gigapisar.insertion.TextInserter
 import ru.gigapisar.model.ModelManager
 import ru.gigapisar.overlay.OverlayManager
@@ -82,6 +86,9 @@ class GigaPisarAccessibilityService : AccessibilityService() {
     private var virtualButtonEnabled = true
     private var volumeKeyEnabled = true
     private var vibrationEnabled = true
+
+    @Volatile
+    private var brainSettings = SettingsRepository.BrainSettings()
 
     private var focusedNode:
         AccessibilityNodeInfo? = null
@@ -175,6 +182,12 @@ class GigaPisarAccessibilityService : AccessibilityService() {
             SettingsRepository
                 .vibrationEnabled(this@GigaPisarAccessibilityService)
                 .collectLatest { enabled -> vibrationEnabled = enabled }
+        }
+
+        serviceScope.launch {
+            SettingsRepository
+                .brain(this@GigaPisarAccessibilityService)
+                .collectLatest { settings -> brainSettings = settings }
         }
     }
 
@@ -398,10 +411,11 @@ class GigaPisarAccessibilityService : AccessibilityService() {
                         return@launch
                     }
 
-                    val text =
+                    val recognized =
                         recognizer.transcribe(
                             audio,
                         )
+                    val (text, brainFailure) = applyBrain(recognized)
 
                     withContext(
                         Dispatchers.Main,
@@ -436,14 +450,17 @@ class GigaPisarAccessibilityService : AccessibilityService() {
                                                 R.string.paste_failed,
                                             ),
                                         )
-                                    } else {
+                                    } else if (brainFailure == null) {
                                         pill.hide()
                                     }
                                 }
                             }
                         }
 
-                        if (insertionMode == InsertionMode.CLIPBOARD && text.isNotBlank()) {
+                        if (brainFailure != null && text.isNotBlank()) {
+                            // The text is in as recognized; say why the Brain did not edit it.
+                            notifyUser(getString(R.string.brain_failed, brainFailure), 6000)
+                        } else if (insertionMode == InsertionMode.CLIPBOARD && text.isNotBlank()) {
                             notifyUser(getString(R.string.copied_to_clipboard))
                         }
                         overlay.setIdle()
@@ -467,6 +484,30 @@ class GigaPisarAccessibilityService : AccessibilityService() {
                     }
                 }
             }
+    }
+
+    /**
+     * Passes the recognized text through the Brain when it is on: a command at the end
+     * ("…Писарь, сделай короче") always, every take only with "edit on the fly". Blocking,
+     * called off the main thread. On failure returns the text to insert as is and the reason.
+     */
+    private fun applyBrain(text: String): Pair<String, String?> {
+        val settings = brainSettings
+        if (!settings.enabled || text.isBlank()) return text to null
+        val provider = BrainProviders.byId(settings.providerId) ?: return text to null
+        val model = settings.model ?: return text to null
+        val key = KeyVault.load(this) ?: return text to null
+        val parsed = Brain.parseCommand(text)
+        if (parsed == null && !settings.everyTake) return text to null
+        // A failed command still puts in what was said before "Писарь".
+        val body = parsed?.first ?: text
+        return try {
+            Brain.transform(provider, key, model, body, parsed?.second) to null
+        } catch (error: BrainException) {
+            body to (error.message ?: "")
+        } catch (_: Exception) {
+            body to getString(R.string.brain_failed_unknown)
+        }
     }
 
     override fun onInterrupt() {
@@ -498,8 +539,11 @@ class GigaPisarAccessibilityService : AccessibilityService() {
     }
 
     /** Errors and hints of the recording flow: on the pill, next to where the text goes. */
-    private fun notifyUser(text: String) {
-        mainHandler.post { pill.showMessage(text, focusedFieldBounds()) }
+    private fun notifyUser(
+        text: String,
+        millis: Long = 2600,
+    ) {
+        mainHandler.post { pill.showMessage(text, focusedFieldBounds(), millis) }
     }
 
     private fun focusedFieldBounds(): Rect? =

@@ -30,6 +30,11 @@ object SettingsRepository {
     private val vibrationEnabledKey =
         booleanPreferencesKey("vibration_enabled")
 
+    private val brainEnabledKey = booleanPreferencesKey("brain_enabled")
+    private val brainEveryTakeKey = booleanPreferencesKey("brain_every_take")
+    private val brainProviderKey = stringPreferencesKey("brain_provider")
+    private val brainModelKey = stringPreferencesKey("brain_model")
+
     fun insertionMode(context: Context): Flow<InsertionMode> =
         context.settingsDataStore.data.map { preferences ->
             when (
@@ -88,6 +93,50 @@ object SettingsRepository {
     ) {
         context.settingsDataStore.edit { preferences ->
             preferences[vibrationEnabledKey] = enabled
+        }
+    }
+
+    /** Brain settings in one piece; the key itself lives in [ru.gigapisar.brain.KeyVault]. */
+    data class BrainSettings(
+        val enabled: Boolean = false,
+        val everyTake: Boolean = false,
+        val providerId: String? = null,
+        val model: String? = null,
+    )
+
+    fun brain(context: Context): Flow<BrainSettings> =
+        context.settingsDataStore.data.map { preferences ->
+            BrainSettings(
+                enabled = preferences[brainEnabledKey] ?: false,
+                everyTake = preferences[brainEveryTakeKey] ?: false,
+                providerId = preferences[brainProviderKey],
+                model = preferences[brainModelKey],
+            )
+        }
+
+    suspend fun setBrainEnabled(
+        context: Context,
+        enabled: Boolean,
+    ) {
+        context.settingsDataStore.edit { it[brainEnabledKey] = enabled }
+    }
+
+    suspend fun setBrainEveryTake(
+        context: Context,
+        enabled: Boolean,
+    ) {
+        context.settingsDataStore.edit { it[brainEveryTakeKey] = enabled }
+    }
+
+    /** A checked service: remembers where to send text and which model answers. */
+    suspend fun setBrainService(
+        context: Context,
+        providerId: String?,
+        model: String?,
+    ) {
+        context.settingsDataStore.edit { preferences ->
+            if (providerId == null) preferences.remove(brainProviderKey) else preferences[brainProviderKey] = providerId
+            if (model == null) preferences.remove(brainModelKey) else preferences[brainModelKey] = model
         }
     }
 }
