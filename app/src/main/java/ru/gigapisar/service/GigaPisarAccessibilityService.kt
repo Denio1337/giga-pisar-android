@@ -31,6 +31,10 @@ import kotlinx.coroutines.withContext
 import ru.gigapisar.MainActivity
 import ru.gigapisar.R
 import ru.gigapisar.audio.AudioRecorder
+import ru.gigapisar.brain.Brain
+import ru.gigapisar.brain.BrainException
+import ru.gigapisar.brain.BrainProviders
+import ru.gigapisar.brain.KeyVault
 import ru.gigapisar.insertion.TextInserter
 import ru.gigapisar.model.ModelManager
 import ru.gigapisar.overlay.OverlayManager
@@ -82,6 +86,9 @@ class GigaPisarAccessibilityService : AccessibilityService() {
     private var virtualButtonEnabled = true
     private var volumeKeyEnabled = true
     private var vibrationEnabled = true
+
+    @Volatile
+    private var brainSettings = SettingsRepository.BrainSettings()
 
     private var focusedNode:
         AccessibilityNodeInfo? = null
@@ -176,6 +183,12 @@ class GigaPisarAccessibilityService : AccessibilityService() {
                 .vibrationEnabled(this@GigaPisarAccessibilityService)
                 .collectLatest { enabled -> vibrationEnabled = enabled }
         }
+
+        serviceScope.launch {
+            SettingsRepository
+                .brain(this@GigaPisarAccessibilityService)
+                .collectLatest { settings -> brainSettings = settings }
+        }
     }
 
     override fun onKeyEvent(event: KeyEvent): Boolean {
@@ -239,6 +252,17 @@ class GigaPisarAccessibilityService : AccessibilityService() {
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         event ?: return
+
+        // The undo offer goes away once the user types or leaves; not on our own insertion.
+        if (pill.showsAction &&
+            SystemClock.uptimeMillis() - undoShownAt > 800 &&
+            (
+                event.eventType == AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED ||
+                    event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
+            )
+        ) {
+            pill.hide()
+        }
 
         when (event.eventType) {
             AccessibilityEvent.TYPE_VIEW_FOCUSED,
@@ -398,14 +422,19 @@ class GigaPisarAccessibilityService : AccessibilityService() {
                         return@launch
                     }
 
-                    val text =
+                    val recognized =
                         recognizer.transcribe(
                             audio,
                         )
+                    val brained = applyBrain(recognized)
+                    val text = brained.text
+                    val brainFailure = brained.failure
 
                     withContext(
                         Dispatchers.Main,
                     ) {
+                        var inserted = false
+                        var insertion: TextInserter.Insertion? = null
                         if (text.isBlank()) {
                             notifyUser(
                                 getString(
@@ -420,30 +449,33 @@ class GigaPisarAccessibilityService : AccessibilityService() {
                                     inserter.putToClipboard(
                                         text,
                                     )
+                                    inserted = true
                                 }
 
                                 InsertionMode.TEXT_FIELD -> {
-                                    val success =
-                                        inserter
-                                            .pasteIntoFocusedField(
-                                                focusedNode,
-                                                text,
-                                            )
+                                    insertion = inserter.insertIntoFocusedField(focusedNode, text)
+                                    inserted = insertion != null
 
-                                    if (!success) {
+                                    if (!inserted) {
                                         notifyUser(
                                             getString(
                                                 R.string.paste_failed,
                                             ),
                                         )
-                                    } else {
+                                    } else if (brainFailure == null && brained.original == null) {
                                         pill.hide()
                                     }
                                 }
                             }
                         }
 
-                        if (insertionMode == InsertionMode.CLIPBOARD && text.isNotBlank()) {
+                        val original = brained.original
+                        if (brainFailure != null && text.isNotBlank()) {
+                            // The text is in as recognized; say why the Brain did not edit it.
+                            notifyUser(getString(R.string.brain_failed, brainFailure), 6000)
+                        } else if (inserted && original != null) {
+                            offerUndo(text, original, insertion)
+                        } else if (insertionMode == InsertionMode.CLIPBOARD && text.isNotBlank()) {
                             notifyUser(getString(R.string.copied_to_clipboard))
                         }
                         overlay.setIdle()
@@ -467,6 +499,69 @@ class GigaPisarAccessibilityService : AccessibilityService() {
                     }
                 }
             }
+    }
+
+    /** What goes into the field; [original] is set when the Brain changed the text, for "Вернуть". */
+    private class BrainOutcome(
+        val text: String,
+        val failure: String? = null,
+        val original: String? = null,
+    )
+
+    /**
+     * Passes the recognized text through the Brain when it is on: a command at the end
+     * ("…Писарь, сделай короче") always, every take only with "edit on the fly". Blocking,
+     * called off the main thread. On failure returns the text to insert as is and the reason.
+     */
+    private fun applyBrain(text: String): BrainOutcome {
+        val settings = brainSettings
+        if (!settings.enabled || text.isBlank()) return BrainOutcome(text)
+        val provider = BrainProviders.byId(settings.providerId) ?: return BrainOutcome(text)
+        val model = settings.model ?: return BrainOutcome(text)
+        val key = KeyVault.load(this, provider.id) ?: return BrainOutcome(text)
+        val parsed = Brain.parseCommand(text)
+        if (parsed == null && !settings.everyTake) return BrainOutcome(text)
+        // A failed command still puts in what was said before "Писарь".
+        val body = parsed?.first ?: text
+        return try {
+            val answer = Brain.transform(provider, key, model, body, parsed?.second)
+            BrainOutcome(answer, original = body.takeIf { it != answer })
+        } catch (error: BrainException) {
+            BrainOutcome(body, failure = error.message ?: "")
+        } catch (_: Exception) {
+            BrainOutcome(body, failure = getString(R.string.brain_failed_unknown))
+        }
+    }
+
+    /** When the undo offer went up: our own text change right after must not dismiss it. */
+    private var undoShownAt = 0L
+
+    /**
+     * "Мозг поправил · Вернуть" above the field for a few seconds. A tap puts back what was
+     * dictated; if the field changed meanwhile, nothing is touched and the original goes to
+     * the clipboard instead.
+     */
+    private fun offerUndo(
+        answer: String,
+        original: String,
+        insertion: TextInserter.Insertion?,
+    ) {
+        undoShownAt = SystemClock.uptimeMillis()
+        pill.showAction(
+            getString(R.string.brain_done),
+            getString(R.string.brain_undo),
+            focusedFieldBounds(),
+            UNDO_OFFER_MS,
+        ) {
+            val restored = insertion != null && inserter.replaceInserted(insertion, answer, original)
+            if (!restored) {
+                inserter.putToClipboard(original)
+                notifyUser(
+                    getString(if (insertion == null) R.string.brain_undo_clipboard else R.string.brain_undo_changed),
+                    4000,
+                )
+            }
+        }
     }
 
     override fun onInterrupt() {
@@ -498,8 +593,11 @@ class GigaPisarAccessibilityService : AccessibilityService() {
     }
 
     /** Errors and hints of the recording flow: on the pill, next to where the text goes. */
-    private fun notifyUser(text: String) {
-        mainHandler.post { pill.showMessage(text, focusedFieldBounds()) }
+    private fun notifyUser(
+        text: String,
+        millis: Long = 2600,
+    ) {
+        mainHandler.post { pill.showMessage(text, focusedFieldBounds(), millis) }
     }
 
     private fun focusedFieldBounds(): Rect? =
@@ -601,5 +699,8 @@ class GigaPisarAccessibilityService : AccessibilityService() {
     companion object {
         // An ordinary tap lasts 100-200 ms; recording starts only on a deliberate hold.
         private const val VOLUME_RECORDING_HOLD_DELAY_MS = 350L
+
+        /** How long "Вернуть" stays offered after a Brain edit. */
+        private const val UNDO_OFFER_MS = 6000L
     }
 }

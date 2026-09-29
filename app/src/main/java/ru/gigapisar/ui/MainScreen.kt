@@ -24,6 +24,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -44,6 +45,8 @@ fun MainScreen(activity: ComponentActivity) {
     var virtualButtonVisible by remember { mutableStateOf(true) }
     var volumeKeyEnabled by remember { mutableStateOf(true) }
     var vibrationEnabled by remember { mutableStateOf(true) }
+    var brain by remember { mutableStateOf(SettingsRepository.BrainSettings()) }
+    var page by rememberSaveable { mutableStateOf(Page.MAIN) }
     var modelInstalled by remember { mutableStateOf(ModelManager(context).isInstalled()) }
     var accessibilityEnabled by remember {
         mutableStateOf(isAccessibilityServiceEnabled(context))
@@ -75,6 +78,9 @@ fun MainScreen(activity: ComponentActivity) {
     LaunchedEffect(context) {
         SettingsRepository.vibrationEnabled(context).collect { vibrationEnabled = it }
     }
+    LaunchedEffect(context) {
+        SettingsRepository.brain(context).collect { brain = it }
+    }
 
     LifecycleResumeEffect(context) {
         accessibilityEnabled = isAccessibilityServiceEnabled(context)
@@ -86,6 +92,10 @@ fun MainScreen(activity: ComponentActivity) {
 
     GigaPisarTheme {
         Surface(modifier = Modifier.fillMaxSize()) {
+            if (page == Page.BRAIN) {
+                BrainScreen(brain = brain, onBack = { page = Page.MAIN })
+                return@Surface
+            }
             Column(
                 modifier =
                     Modifier
@@ -127,6 +137,7 @@ fun MainScreen(activity: ComponentActivity) {
                     onVibration = { scope.launch { SettingsRepository.setVibrationEnabled(context, it) } },
                     onRequestMicrophone = requestMicrophone,
                     onOpenAccessibilitySettings = openAccessibilitySettings,
+                    brainSection = { BrainRow(brain = brain, onOpen = { page = Page.BRAIN }) },
                 )
             }
         }
@@ -165,3 +176,6 @@ private fun Header() {
         }
     }
 }
+
+/** The app has two pages: the settings list and the Brain page opened from it. */
+private enum class Page { MAIN, BRAIN }

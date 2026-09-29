@@ -11,11 +11,13 @@ import android.graphics.Rect
 import android.graphics.RectF
 import android.graphics.Shader
 import android.graphics.Typeface
+import android.text.StaticLayout
+import android.text.TextPaint
+import android.text.TextUtils
 import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
 import kotlin.math.max
-import kotlin.math.min
 import kotlin.math.roundToInt
 import kotlin.math.sin
 
@@ -52,6 +54,7 @@ class RecordingPill(
         level: () -> Float,
     ) {
         view.removeCallbacks(hideRunnable)
+        dropAction()
         view.listen(level)
         place(anchor)
     }
@@ -59,6 +62,7 @@ class RecordingPill(
     /** Recording is over, recognition runs. */
     fun showProcessing() {
         view.removeCallbacks(hideRunnable)
+        dropAction()
         view.process()
         place(lastAnchor)
     }
@@ -70,14 +74,42 @@ class RecordingPill(
         millis: Long = 2600,
     ) {
         view.removeCallbacks(hideRunnable)
+        dropAction()
         view.message(text)
         place(anchor)
         view.postDelayed(hideRunnable, millis)
     }
 
+    /**
+     * A message with a tappable action ("Мозг поправил · Вернуть"). Only while it shows, the
+     * pill takes touches, and only on itself; the rest of the screen works as usual.
+     */
+    fun showAction(
+        text: String,
+        action: String,
+        anchor: Rect?,
+        millis: Long,
+        onAction: () -> Unit,
+    ) {
+        view.removeCallbacks(hideRunnable)
+        view.message(text, action)
+        view.setOnClickListener {
+            hide()
+            onAction()
+        }
+        touchable = true
+        place(anchor)
+        view.postDelayed(hideRunnable, millis)
+    }
+
+    /** True while an action is offered; the service hides it once the user types or leaves. */
+    val showsAction: Boolean
+        get() = attached && touchable
+
     fun hide() {
         view.removeCallbacks(hideRunnable)
         view.stop()
+        dropAction()
         if (!attached) return
         try {
             windowManager.removeView(view)
@@ -87,7 +119,14 @@ class RecordingPill(
         attached = false
     }
 
+    private fun dropAction() {
+        view.setOnClickListener(null)
+        view.isClickable = false
+        touchable = false
+    }
+
     private var lastAnchor: Rect? = null
+    private var touchable = false
 
     private fun place(anchor: Rect?) {
         lastAnchor = anchor
@@ -106,6 +145,12 @@ class RecordingPill(
             params.y = screenH - h - (140 * metrics.density).roundToInt()
         }
         params.y = params.y.coerceIn(gap, max(gap, screenH - h - gap))
+        params.flags =
+            if (touchable) {
+                params.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE.inv()
+            } else {
+                params.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+            }
         try {
             if (attached) {
                 windowManager.updateViewLayout(view, params)
@@ -161,7 +206,7 @@ class RecordingPill(
                 color = if (dark) 0x33FFFFFF else 0x1F000000
             }
         private val textPaint =
-            Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
                 textSize = 13 * resources.displayMetrics.scaledDensity
                 typeface = Typeface.DEFAULT
                 color = if (dark) 0xE6FFFFFF.toInt() else 0xD9000000.toInt()
@@ -171,6 +216,16 @@ class RecordingPill(
         private var mode = Mode.IDLE
         private var level: () -> Float = { 0f }
         private var text = ""
+        private var textLayout: StaticLayout? = null
+        private var action: String? = null
+        private val actionGap = 16 * density
+        private val actionPaint =
+            Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                textSize = 14 * resources.displayMetrics.scaledDensity
+                typeface = Typeface.DEFAULT_BOLD
+                color = if (dark) 0xFF96D78F.toInt() else 0xFF2E6B30.toInt()
+            }
+        private val textPadV = 7 * density
         private val heights = FloatArray(barCount)
         private var phase = 0f
 
@@ -186,11 +241,24 @@ class RecordingPill(
 
         fun pillWidth(): Int =
             when (mode) {
-                Mode.MESSAGE -> (2 * padding + min(textPaint.measureText(text), resources.displayMetrics.widthPixels * 0.8f)).roundToInt()
+                Mode.MESSAGE -> (2 * padding + messageWidth()).roundToInt()
                 else -> (2 * padding + barsWidth).roundToInt()
             }
 
-        fun pillHeight(): Int = height.roundToInt()
+        fun pillHeight(): Int =
+            if (mode == Mode.MESSAGE) {
+                // With a button it is a touch target: at least 40 dp tall.
+                val minHeight = if (action != null) 40 * density else height
+                max(minHeight, (textLayout?.height ?: 0) + 2 * textPadV).roundToInt()
+            } else {
+                height.roundToInt()
+            }
+
+        private fun messageWidth(): Float {
+            val layout = textLayout ?: return 0f
+            val textWidth = (0 until layout.lineCount).maxOfOrNull { layout.getLineWidth(it) } ?: 0f
+            return textWidth + (action?.let { actionPaint.measureText(it) + actionGap } ?: 0f)
+        }
 
         fun listen(level: () -> Float) {
             this.level = level
@@ -205,9 +273,22 @@ class RecordingPill(
             restart()
         }
 
-        fun message(text: String) {
+        fun message(
+            text: String,
+            action: String? = null,
+        ) {
             removeCallbacks(frame)
             this.text = text
+            this.action = action
+            // Long reasons (the Brain's especially) wrap onto a few lines instead of being cut.
+            val actionRoom = action?.let { actionPaint.measureText(it) + actionGap } ?: 0f
+            val maxWidth = (resources.displayMetrics.widthPixels * 0.8f - 2 * padding - actionRoom).roundToInt()
+            textLayout =
+                StaticLayout.Builder
+                    .obtain(text, 0, text.length, textPaint, maxWidth)
+                    .setMaxLines(4)
+                    .setEllipsize(TextUtils.TruncateAt.END)
+                    .build()
             mode = Mode.MESSAGE
             requestLayout()
             invalidate()
@@ -254,13 +335,21 @@ class RecordingPill(
         override fun onDraw(canvas: Canvas) {
             if (mode == Mode.IDLE) return
             val w = pillWidth().toFloat()
-            val r = RectF(1f, 1f, w + 1f, height + 1f)
-            canvas.drawRoundRect(r, height / 2, height / 2, background)
-            canvas.drawRoundRect(r, height / 2, height / 2, border)
+            val h = pillHeight().toFloat()
+            val r = RectF(1f, 1f, w + 1f, h + 1f)
+            val radius = height / 2
+            canvas.drawRoundRect(r, radius, radius, background)
+            canvas.drawRoundRect(r, radius, radius, border)
             if (mode == Mode.MESSAGE) {
-                val y = r.centerY() - (textPaint.descent() + textPaint.ascent()) / 2
-                val shown = TextUtilsCompat.ellipsize(text, textPaint, w - 2 * padding)
-                canvas.drawText(shown, r.left + padding, y, textPaint)
+                val layout = textLayout ?: return
+                canvas.save()
+                canvas.translate(r.left + padding, r.centerY() - layout.height / 2f)
+                layout.draw(canvas)
+                canvas.restore()
+                action?.let {
+                    val y = r.centerY() - (actionPaint.descent() + actionPaint.ascent()) / 2
+                    canvas.drawText(it, r.right - padding - actionPaint.measureText(it), y, actionPaint)
+                }
                 return
             }
             var x = r.left + padding
@@ -272,19 +361,6 @@ class RecordingPill(
                 canvas.drawRoundRect(RectF(x, top, x + barWidth, top + h), barWidth / 2, barWidth / 2, barPaint)
                 x += barWidth + barGap
             }
-        }
-    }
-
-    private object TextUtilsCompat {
-        fun ellipsize(
-            text: String,
-            paint: Paint,
-            width: Float,
-        ): String {
-            if (paint.measureText(text) <= width) return text
-            var end = text.length
-            while (end > 0 && paint.measureText(text, 0, end) + paint.measureText("…") > width) end--
-            return text.substring(0, end) + "…"
         }
     }
 }

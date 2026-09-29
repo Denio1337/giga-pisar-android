@@ -1,0 +1,58 @@
+package ru.gigapisar.brain
+
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
+import org.junit.Test
+
+class BrainTest {
+    @Test
+    fun commandAfterAddress() {
+        assertEquals(
+            "Жду ответа до пятницы." to "сделай короче",
+            Brain.parseCommand("Жду ответа до пятницы. Писарь, сделай короче."),
+        )
+        assertEquals(
+            "Созвон в пять" to "переведи на английский",
+            Brain.parseCommand("Созвон в пять, Гига Писарь, переведи на английский"),
+        )
+        // Recognition often hears "песарь".
+        assertEquals("Текст." to "исправь", Brain.parseCommand("Текст. Песарь, исправь"))
+    }
+
+    @Test
+    fun lastAddressWins() {
+        assertEquals(
+            "Я пользуюсь Писарем, и писарь хороший." to "сократи",
+            Brain.parseCommand("Я пользуюсь Писарем, и писарь хороший. Писарь, сократи"),
+        )
+    }
+
+    @Test
+    fun noCommandWithoutAddressOrText() {
+        assertNull(Brain.parseCommand("Просто текст без обращения"))
+        assertNull(Brain.parseCommand("Писарь, сделай короче"))
+        assertNull(Brain.parseCommand("Какой-то текст. Писарь"))
+        // "писарей" is not an address.
+        assertNull(Brain.parseCommand("Было много писарей в канцелярии"))
+    }
+
+    @Test
+    fun serviceFromKey() {
+        assertEquals(BrainProviders.DeepSeek, BrainProviders.fromKey("sk-" + "0123456789abcdef".repeat(2)))
+        assertEquals(BrainProviders.OpenRouter, BrainProviders.fromKey("sk-or-v1-abc"))
+        assertEquals(BrainProviders.Anthropic, BrainProviders.fromKey("sk-ant-api03-abc"))
+        assertEquals(BrainProviders.Groq, BrainProviders.fromKey("gsk_abc"))
+        assertEquals(BrainProviders.Gemini, BrainProviders.fromKey("AIzaSyabc"))
+        assertEquals(BrainProviders.OpenAI, BrainProviders.fromKey("sk-proj-abc"))
+        assertNull(BrainProviders.fromKey("sk-short"))
+    }
+
+    @Test
+    fun failureInPlainWords() {
+        assertEquals("сервис не принял ключ", BrainClient.describeFailure(401, """{"error":{"message":"Invalid key"}}"""))
+        assertEquals(
+            "на счету сервиса нет денег или не подключена оплата API (это отдельно от подписки вроде ChatGPT Plus)",
+            BrainClient.describeFailure(402, """{"error":{"message":"Insufficient Balance"}}"""),
+        )
+    }
+}

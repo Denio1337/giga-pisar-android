@@ -6,7 +6,8 @@
         typeViewFocused|
         typeWindowStateChanged|
         typeWindowContentChanged|
-        typeViewTextSelectionChanged"
+        typeViewTextSelectionChanged|
+        typeViewTextChanged"
     android:accessibilityFeedbackType="feedbackGeneric"
     android:label="@string/app_name"
     android:accessibilityFlags="

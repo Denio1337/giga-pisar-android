@@ -8,11 +8,7 @@ import android.os.Looper
 import android.os.SystemClock
 import java.io.ByteArrayOutputStream
 import kotlin.concurrent.thread
-import kotlin.math.log10
-import kotlin.math.max
 import kotlin.math.min
-import kotlin.math.pow
-import kotlin.math.sqrt
 
 class AudioRecorder(
     var onTimeout: (() -> Unit)? = null,
@@ -29,16 +25,10 @@ class AudioRecorder(
 
         /** 20 ms of 16-bit mono audio. */
         private const val READ_CHUNK_BYTES = SAMPLE_RATE / 50 * 2
-
-        // Wave scale in dB below full scale: a quiet room sits near -55, speech peaks at -35..-12.
-        private const val DB_FLOOR = -50.0
-        private const val DB_CEIL = -15.0
-
-        // Lifts the middle so ordinary speech does not hang in the lower third.
-        private const val LEVEL_CURVE = 0.6
     }
 
     private val lock = Any()
+    private val meter = LevelMeter(SAMPLE_RATE)
 
     private var audioRecord: AudioRecord? = null
     private var recordingThread: Thread? = null
@@ -48,7 +38,7 @@ class AudioRecorder(
     private var recording = false
 
     /**
-     * Loudness of the latest 20 ms chunk, 0..1 on the same dB scale as the Mac app. The
+     * Loudness of the latest 20 ms chunk, 0..1, adapted to the microphone (see [LevelMeter]). The
      * recording pill and the floating button read it every frame; it is 0 when nothing
      * is being recorded.
      */
@@ -174,7 +164,7 @@ class AudioRecorder(
                                 count,
                             )
                         }
-                        level = levelOf(buffer, count)
+                        level = meter.levelOf(buffer, count)
                     }
 
                     count == AudioRecord.ERROR_DEAD_OBJECT -> {
@@ -194,36 +184,6 @@ class AudioRecorder(
             recording = false
             level = 0f
         }
-    }
-
-    /**
-     * Loudness of little-endian 16-bit PCM for the wave: the loudest 10 ms window, in dB,
-     * mapped so a quiet room lies flat and ordinary speech fills most of the height. The
-     * same floor, ceiling and curve as the Mac app.
-     */
-    private fun levelOf(
-        bytes: ByteArray,
-        count: Int,
-    ): Float {
-        val samples = count / 2
-        if (samples == 0) return 0f
-        val window = SAMPLE_RATE / 100
-        var loudest = 0.0
-        var start = 0
-        while (start < samples) {
-            val end = min(start + window, samples)
-            var sum = 0.0
-            for (n in start until end) {
-                val i = n * 2
-                val sample = ((bytes[i].toInt() and 0xFF) or (bytes[i + 1].toInt() shl 8)) / 32768.0
-                sum += sample * sample
-            }
-            loudest = max(loudest, sqrt(sum / (end - start)))
-            start = end
-        }
-        val db = 20 * log10(max(loudest, 1e-7))
-        val norm = ((db - DB_FLOOR) / (DB_CEIL - DB_FLOOR)).coerceIn(0.0, 1.0)
-        return norm.pow(LEVEL_CURVE).toFloat()
     }
 
     fun stop(): ShortArray {

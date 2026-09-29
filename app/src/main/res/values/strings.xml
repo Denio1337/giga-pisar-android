@@ -78,4 +78,43 @@
     <string name="about_source_hint">GitHub</string>
     <string name="about_share">Рассказать другу</string>
     <string name="share_text">Гига Писарь: диктовка на русском прямо на телефоне, без интернета. Скачать: %1$s</string>
+
+    <string name="section_brain">Мозг</string>
+    <string name="brain_key">Ключ сервиса</string>
+    <string name="brain_switch">Мозг</string>
+    <string name="brain_switch_hint">Команды голосом в конце фразы: «…Писарь, сделай короче»</string>
+    <string name="brain_every_take">Править на лету</string>
+    <string name="brain_every_take_hint">Каждая диктовка: знаки препинания, без «э-э» и повторов</string>
+    <string name="brain_privacy">С Мозгом текст уходит в выбранный сервис через интернет. Без Мозга всё остаётся на телефоне.</string>
+    <string name="brain_key_hint">Сервис определится по ключу, модель выберется сама.</string>
+    <string name="brain_key_placeholder">Ключ API</string>
+    <string name="brain_guessed">Похоже на ключ %1$s</string>
+    <string name="brain_pick_service">Выберите сервис:</string>
+    <string name="brain_check">Проверить и сохранить</string>
+    <string name="brain_check_ok">%1$s, %2$s. Пробный запрос прошёл</string>
+    <string name="brain_forget">Удалить ключ этого сервиса</string>
+    <string name="brain_failed">Мозг: %1$s. Вставил как есть</string>
+    <string name="brain_failed_unknown">не получилось</string>
+
+    <string name="back">Назад</string>
+    <string name="brain_row_none">Выключен. Нужен ключ DeepSeek, OpenAI или другого сервиса</string>
+    <string name="brain_row_on">Включён. %1$s, %2$s</string>
+    <string name="brain_row_off">Выключен. Ключ %1$s сохранён</string>
+    <string name="brain_services">Сервисы</string>
+    <string name="brain_models">Модель</string>
+    <string name="brain_add_key">Добавить ключ</string>
+    <string name="brain_key_saved">Ключ сохранён</string>
+    <string name="brain_where_keys">Где взять ключ</string>
+    <string name="brain_no_model">не нашлась подходящая модель</string>
+    <string name="brain_status_ok">Всё работает</string>
+    <string name="brain_status_ready">Готов к работе</string>
+    <string name="brain_status_failed">Не получилось</string>
+    <string name="brain_status_checking">Проверяю…</string>
+    <string name="brain_status_none">Нужен ключ</string>
+    <string name="brain_status_none_text">Вставьте ниже ключ API сервиса, например DeepSeek. Ключ хранится зашифрованным только на этом телефоне.</string>
+
+    <string name="brain_done">✓ Мозг поправил</string>
+    <string name="brain_undo">Вернуть</string>
+    <string name="brain_undo_changed">Поле уже изменилось. Исходный текст в буфере обмена</string>
+    <string name="brain_undo_clipboard">Исходный текст в буфере обмена</string>
 </resources>
