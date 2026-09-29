@@ -11,27 +11,33 @@ import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 
 /**
- * The service key, encrypted with an AES key that lives in the Android Keystore and never
- * leaves it. What sits in the app's files is only ciphertext, like the Keychain on the Mac.
+ * Service keys, one per service, encrypted with an AES key that lives in the Android
+ * Keystore and never leaves it. What sits in the app's files is only ciphertext, like the
+ * Keychain on the Mac. Several services can be kept at once and switched between.
  */
 object KeyVault {
     private const val KEYSTORE = "AndroidKeyStore"
     private const val ALIAS = "giga_pisar_brain"
     private const val PREFS = "giga_pisar_brain_key"
-    private const val ENTRY = "key"
+    private const val PREFIX = "key_"
 
     fun save(
         context: Context,
+        providerId: String,
         key: String,
     ) {
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
         cipher.init(Cipher.ENCRYPT_MODE, secretKey())
         val sealed = cipher.iv + cipher.doFinal(key.trim().toByteArray(Charsets.UTF_8))
-        prefs(context).edit().putString(ENTRY, Base64.encodeToString(sealed, Base64.NO_WRAP)).apply()
+        prefs(context).edit().putString(PREFIX + providerId, Base64.encodeToString(sealed, Base64.NO_WRAP)).apply()
     }
 
-    fun load(context: Context): String? {
-        val stored = prefs(context).getString(ENTRY, null) ?: return null
+    fun load(
+        context: Context,
+        providerId: String?,
+    ): String? {
+        if (providerId == null) return null
+        val stored = prefs(context).getString(PREFIX + providerId, null) ?: return null
         return try {
             val sealed = Base64.decode(stored, Base64.NO_WRAP)
             val cipher = Cipher.getInstance("AES/GCM/NoPadding")
@@ -43,8 +49,22 @@ object KeyVault {
         }
     }
 
-    fun clear(context: Context) {
-        prefs(context).edit().remove(ENTRY).apply()
+    /** Services that have a key saved, in the order of [BrainProviders.all]. */
+    fun savedProviders(context: Context): List<BrainProvider> {
+        val ids =
+            prefs(context)
+                .all.keys
+                .filter { it.startsWith(PREFIX) }
+                .map { it.removePrefix(PREFIX) }
+                .toSet()
+        return BrainProviders.all.filter { it.id in ids }
+    }
+
+    fun clear(
+        context: Context,
+        providerId: String,
+    ) {
+        prefs(context).edit().remove(PREFIX + providerId).apply()
     }
 
     private fun prefs(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)

@@ -496,7 +496,7 @@ class GigaPisarAccessibilityService : AccessibilityService() {
         if (!settings.enabled || text.isBlank()) return text to null
         val provider = BrainProviders.byId(settings.providerId) ?: return text to null
         val model = settings.model ?: return text to null
-        val key = KeyVault.load(this) ?: return text to null
+        val key = KeyVault.load(this, provider.id) ?: return text to null
         val parsed = Brain.parseCommand(text)
         if (parsed == null && !settings.everyTake) return text to null
         // A failed command still puts in what was said before "Писарь".

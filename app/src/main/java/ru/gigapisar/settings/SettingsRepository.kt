@@ -30,6 +30,8 @@ object SettingsRepository {
     private val vibrationEnabledKey =
         booleanPreferencesKey("vibration_enabled")
 
+    private const val BRAIN_MODEL_PREFIX = "brain_model_for_"
+
     private val brainEnabledKey = booleanPreferencesKey("brain_enabled")
     private val brainEveryTakeKey = booleanPreferencesKey("brain_every_take")
     private val brainProviderKey = stringPreferencesKey("brain_provider")
@@ -102,6 +104,8 @@ object SettingsRepository {
         val everyTake: Boolean = false,
         val providerId: String? = null,
         val model: String? = null,
+        /** The last model chosen for each service, so switching services keeps each one's pick. */
+        val modelsByProvider: Map<String, String> = emptyMap(),
     )
 
     fun brain(context: Context): Flow<BrainSettings> =
@@ -111,6 +115,12 @@ object SettingsRepository {
                 everyTake = preferences[brainEveryTakeKey] ?: false,
                 providerId = preferences[brainProviderKey],
                 model = preferences[brainModelKey],
+                modelsByProvider =
+                    preferences
+                        .asMap()
+                        .filterKeys { it.name.startsWith(BRAIN_MODEL_PREFIX) }
+                        .map { (k, v) -> k.name.removePrefix(BRAIN_MODEL_PREFIX) to v.toString() }
+                        .toMap(),
             )
         }
 
@@ -128,6 +138,14 @@ object SettingsRepository {
         context.settingsDataStore.edit { it[brainEveryTakeKey] = enabled }
     }
 
+    /** Forgets a service's saved model along with its key. */
+    suspend fun forgetBrainService(
+        context: Context,
+        providerId: String,
+    ) {
+        context.settingsDataStore.edit { it.remove(stringPreferencesKey(BRAIN_MODEL_PREFIX + providerId)) }
+    }
+
     /** A checked service: remembers where to send text and which model answers. */
     suspend fun setBrainService(
         context: Context,
@@ -137,6 +155,7 @@ object SettingsRepository {
         context.settingsDataStore.edit { preferences ->
             if (providerId == null) preferences.remove(brainProviderKey) else preferences[brainProviderKey] = providerId
             if (model == null) preferences.remove(brainModelKey) else preferences[brainModelKey] = model
+            if (providerId != null && model != null) preferences[stringPreferencesKey(BRAIN_MODEL_PREFIX + providerId)] = model
         }
     }
 }
