@@ -19,7 +19,7 @@
 
 ## Запуск
 
-Приложение можно собрать вручную, используя инструкцию ниже, или загрузить на устройство актуальную релизную [версию](https://github.com/Denio1337/giga-pisar-android/releases/latest).
+Приложение можно собрать вручную, используя инструкцию ниже, или загрузить на устройство актуальную релизную [версию](https://github.com/moznoazachem/giga-pisar-android/releases/latest).
 
 ## Требования для разработки
 
@@ -36,7 +36,7 @@
 Клонируйте репозиторий и перейдите в его каталог:
 
 ```bash
-git clone https://github.com/Denio1337/giga-pisar-android
+git clone https://github.com/moznoazachem/giga-pisar-android
 cd giga-pisar-android
 ```
 
