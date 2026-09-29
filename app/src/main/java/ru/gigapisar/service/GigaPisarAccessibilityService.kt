@@ -506,20 +506,15 @@ class GigaPisarAccessibilityService : AccessibilityService() {
 
             if (!vibrator.hasVibrator()) return
 
-            val attributes =
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    VibrationAttributes.createForUsage(VibrationAttributes.USAGE_ACCESSIBILITY)
-                } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                    VibrationAttributes
-                        .Builder()
-                        .setUsage(VibrationAttributes.USAGE_ACCESSIBILITY)
-                        .build()
-                } else {
-                    null
-                }
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+                @Suppress("DEPRECATION")
+                vibrator.vibrate(30L)
+                return
+            }
 
+            // areAllEffectsSupported exists since API 30: older devices get the plain pulse.
             val effect =
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                     when {
                         vibrator.areAllEffectsSupported(VibrationEffect.EFFECT_CLICK) ==
                             Vibrator.VIBRATION_EFFECT_SUPPORT_YES -> {
@@ -536,12 +531,15 @@ class GigaPisarAccessibilityService : AccessibilityService() {
                         }
                     }
                 } else {
-                    @Suppress("DEPRECATION")
                     VibrationEffect.createOneShot(30L, VibrationEffect.DEFAULT_AMPLITUDE)
                 }
 
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && attributes != null) {
-                vibrator.vibrate(effect, attributes)
+            // vibrate(effect, VibrationAttributes) exists since API 33.
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                vibrator.vibrate(
+                    effect,
+                    VibrationAttributes.createForUsage(VibrationAttributes.USAGE_ACCESSIBILITY),
+                )
             } else {
                 vibrator.vibrate(effect)
             }
