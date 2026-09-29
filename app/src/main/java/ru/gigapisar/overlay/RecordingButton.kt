@@ -14,8 +14,6 @@ import android.view.ViewConfiguration
 import ru.gigapisar.R
 import kotlin.math.abs
 import kotlin.math.hypot
-import kotlin.math.max
-import kotlin.math.sqrt
 
 class RecordingButton(
     context: Context,
@@ -126,7 +124,6 @@ class RecordingButton(
         }
 
     private var greenShader: Shader? = null
-    private var runningPeak = 0.05f
     private var smoothLevel = 0f
     private var animationStart = 0L
 
@@ -385,10 +382,9 @@ class RecordingButton(
         val t = (SystemClock.uptimeMillis() - animationStart).toFloat()
 
         if (state == State.RECORDING) {
-            // Glow that follows the voice, with the same adaptive scale as the pill.
+            // Glow that follows the voice, on the same dB scale as the pill.
             val raw = level()
-            runningPeak = max(raw, runningPeak * 0.995f).coerceAtLeast(0.02f)
-            val loud = sqrt((raw / runningPeak).coerceIn(0f, 1f))
+            val loud = raw.coerceIn(0f, 1f)
             smoothLevel += (loud - smoothLevel) * 0.3f
             effectPaint.style = Paint.Style.FILL
             effectPaint.color = 0x4063CF62
@@ -449,7 +445,6 @@ class RecordingButton(
         if (value != State.IDLE) {
             animationStart = SystemClock.uptimeMillis()
             if (value == State.RECORDING) {
-                runningPeak = 0.05f
                 smoothLevel = 0f
             }
             postOnAnimation(frame)
