@@ -8,35 +8,17 @@
     </string>
 
     <string name="clipboard_label">Гига Писарь</string>
-
-    <string name="insertion_mode">Режим вставки</string>
-    <string name="mode_clipboard">Буфер обмена</string>
-    <string name="mode_text_field">Текстовое поле</string>
-
-    <string name="recording_button">Кнопка записи</string>
-    <string name="show_recording_button">Показывать виртуальную кнопку записи</string>
-    <string name="text_field_button_visibility_hint">В режиме «Текстовое поле» кнопка отображается, когда на экране есть активное поле ввода.</string>
-
-    <string name="permissions">Разрешения</string>
+    <string name="mode_clipboard">В буфер обмена</string>
+    <string name="mode_text_field">Сразу в поле ввода</string>
     <string name="microphone">Микрофон</string>
-    <string name="microphone_status">%1$s: %2$s</string>
-    <string name="permission_granted">разрешён</string>
-    <string name="permission_denied">не разрешён</string>
-    <string name="grant_microphone">Разрешить микрофон</string>
+    <string name="permission_granted">Разрешён</string>
+    <string name="permission_denied">Не разрешён, нажмите, чтобы разрешить</string>
 
-    <string name="accessibility_service">Сервис специальных возможностей</string>
-    <string name="accessibility_status">%1$s: %2$s</string>
-    <string name="service_enabled">включён</string>
-    <string name="service_disabled">выключен</string>
-    <string name="open_accessibility_settings">Открыть настройки специальных возможностей</string>
+    <string name="accessibility_service">Специальные возможности</string>
+    <string name="service_enabled">Включены</string>
+    <string name="service_disabled">Выключены, нажмите, чтобы включить</string>
 
-    <string name="model_name">Модель GigaAM</string>
-    <string name="model_installed">Модель установлена</string>
-    <string name="model_not_installed">Модель не установлена</string>
-    <string name="model_description">
-        GigaAM v3 E2E CTC INT8, около 225 МБ
-    </string>
-    <string name="download_model">Загрузить модель</string>
+    <string name="model_name">Модель GigaAM v3</string>
     <string name="downloading_model">Загрузка модели: %1$d%%</string>
     <string name="download_error">Ошибка загрузки: %1$s</string>
     <string name="model_verification_failed">Модель скачана, но проверка установки не пройдена</string>
@@ -66,7 +48,34 @@
     <string name="setup_model_text">GigaAM, 225 МБ. Скачивается один раз, потом Писарь работает без интернета. Лучше по Wi-Fi.</string>
     <string name="setup_model_button">Скачать</string>
     <string name="setup_model_retry">Попробовать ещё раз</string>
-    <string name="ready_title">✓ Всё готово</string>
+    <string name="ready_title">Всё готово</string>
     <string name="ready_text">Зажмите громкость вниз в любом поле ввода и говорите. Отпустите, и текст появится.</string>
     <string name="ready_try_here">Попробуйте здесь…</string>
+
+    <string name="ready_text_button">Нажмите и держите плавающую кнопку в любом поле ввода и говорите. Отпустите, и текст появится.</string>
+    <string name="ready_text_nothing">Включите ниже плавающую кнопку или запись кнопкой громкости, иначе диктовать будет нечем.</string>
+
+    <string name="section_dictation">Диктовка</string>
+    <string name="floating_button">Плавающая кнопка</string>
+    <string name="floating_button_always">Круглая кнопка записи поверх приложений</string>
+    <string name="floating_button_text_field">Появляется, когда открыто поле ввода</string>
+    <string name="volume_key">Запись кнопкой громкости</string>
+    <string name="volume_key_hint">Зажмите громкость вниз и говорите</string>
+    <string name="vibration">Вибрация</string>
+    <string name="vibration_hint">Коротко в начале и в конце записи</string>
+
+    <string name="section_insertion">Куда вставлять текст</string>
+    <string name="mode_text_field_hint">Текст появляется там, где стоит курсор</string>
+    <string name="mode_clipboard_hint">Вставляете сами, долгим нажатием</string>
+
+    <string name="section_permissions">Разрешения</string>
+    <string name="section_recognition">Распознавание</string>
+    <string name="model_installed_hint">Установлена, 225 МБ. Работает без интернета</string>
+
+    <string name="section_about">О приложении</string>
+    <string name="about_site">Сайт</string>
+    <string name="about_source">Исходный код</string>
+    <string name="about_source_hint">GitHub</string>
+    <string name="about_share">Рассказать другу</string>
+    <string name="share_text">Гига Писарь: диктовка на русском прямо на телефоне, без интернета. Скачать: %1$s</string>
 </resources>
