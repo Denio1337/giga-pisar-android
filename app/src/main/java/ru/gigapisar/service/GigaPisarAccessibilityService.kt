@@ -80,6 +80,8 @@ class GigaPisarAccessibilityService : AccessibilityService() {
         InsertionMode.TEXT_FIELD
 
     private var virtualButtonEnabled = true
+    private var volumeKeyEnabled = true
+    private var vibrationEnabled = true
 
     private var focusedNode:
         AccessibilityNodeInfo? = null
@@ -162,10 +164,27 @@ class GigaPisarAccessibilityService : AccessibilityService() {
                     updateButtonVisibility()
                 }
         }
+
+        serviceScope.launch {
+            SettingsRepository
+                .volumeKeyEnabled(this@GigaPisarAccessibilityService)
+                .collectLatest { enabled -> volumeKeyEnabled = enabled }
+        }
+
+        serviceScope.launch {
+            SettingsRepository
+                .vibrationEnabled(this@GigaPisarAccessibilityService)
+                .collectLatest { enabled -> vibrationEnabled = enabled }
+        }
     }
 
     override fun onKeyEvent(event: KeyEvent): Boolean {
         if (event.keyCode != KeyEvent.KEYCODE_VOLUME_DOWN) {
+            return false
+        }
+        // Turned off in settings: the key is plain volume again. A press that began
+        // while it was on still gets its release, so a recording never hangs.
+        if (!volumeKeyEnabled && !volumeKeyPressed) {
             return false
         }
 
@@ -494,6 +513,7 @@ class GigaPisarAccessibilityService : AccessibilityService() {
 
     /** A short tick at the start and the end of a recording: dictation without looking at the screen. */
     private fun buzz() {
+        if (!vibrationEnabled) return
         try {
             val vibrator =
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {

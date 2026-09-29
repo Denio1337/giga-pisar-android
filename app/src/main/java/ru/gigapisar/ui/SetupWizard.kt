@@ -1,6 +1,8 @@
 package ru.gigapisar.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -8,13 +10,17 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -22,8 +28,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
@@ -82,22 +90,19 @@ internal fun SetupWizard(
 private fun StepBar(step: Int) {
     Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
         for (i in 1..3) {
-            LinearProgressIndicator(
-                progress = {
-                    if (i < step) {
-                        1f
-                    } else if (i == step) {
-                        0.5f
-                    } else {
-                        0f
-                    }
-                },
+            Box(
                 modifier =
                     Modifier
                         .weight(1f)
                         .height(6.dp)
-                        .clip(RoundedCornerShape(3.dp)),
-                drawStopIndicator = {},
+                        .clip(RoundedCornerShape(3.dp))
+                        .background(
+                            if (i <= step) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.surfaceContainerHighest
+                            },
+                        ),
             )
         }
     }
@@ -181,28 +186,55 @@ private fun ModelStep(onModelInstalled: () -> Unit) {
 
 /** Shown on top of the settings once everything is ready, with a field to try dictation right away. */
 @Composable
-internal fun ReadyCard() {
+internal fun ReadyCard(
+    volumeKeyEnabled: Boolean,
+    buttonEnabled: Boolean,
+    modifier: Modifier = Modifier,
+) {
     val context = LocalContext.current
     var sample by remember { mutableStateOf("") }
+    val hint =
+        when {
+            volumeKeyEnabled -> R.string.ready_text
+            buttonEnabled -> R.string.ready_text_button
+            else -> R.string.ready_text_nothing
+        }
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
     ) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Outlined.CheckCircle,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                )
+                Text(
+                    text = context.getString(R.string.ready_title),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                )
+            }
             Text(
-                text = context.getString(R.string.ready_title),
-                style = MaterialTheme.typography.titleMedium,
+                text = context.getString(hint),
+                style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onPrimaryContainer,
             )
-            Text(
-                text = context.getString(R.string.ready_text),
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
-            )
-            OutlinedTextField(
+            TextField(
                 value = sample,
                 onValueChange = { sample = it },
                 placeholder = { Text(context.getString(R.string.ready_try_here)) },
                 modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(14.dp),
+                colors =
+                    TextFieldDefaults.colors(
+                        focusedContainerColor = MaterialTheme.colorScheme.surface,
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                        focusedIndicatorColor = Color.Transparent,
+                        unfocusedIndicatorColor = Color.Transparent,
+                    ),
             )
         }
     }

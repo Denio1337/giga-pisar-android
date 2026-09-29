@@ -24,6 +24,12 @@ object SettingsRepository {
     private val virtualButtonVisibleKey =
         booleanPreferencesKey("virtual_button_visible")
 
+    private val volumeKeyEnabledKey =
+        booleanPreferencesKey("volume_key_enabled")
+
+    private val vibrationEnabledKey =
+        booleanPreferencesKey("vibration_enabled")
+
     fun insertionMode(context: Context): Flow<InsertionMode> =
         context.settingsDataStore.data.map { preferences ->
             when (
@@ -54,6 +60,34 @@ object SettingsRepository {
     ) {
         context.settingsDataStore.edit { preferences ->
             preferences[virtualButtonVisibleKey] = visible
+        }
+    }
+
+    fun volumeKeyEnabled(context: Context): Flow<Boolean> =
+        context.settingsDataStore.data.map { preferences ->
+            preferences[volumeKeyEnabledKey] ?: true
+        }
+
+    fun vibrationEnabled(context: Context): Flow<Boolean> =
+        context.settingsDataStore.data.map { preferences ->
+            preferences[vibrationEnabledKey] ?: true
+        }
+
+    suspend fun setVolumeKeyEnabled(
+        context: Context,
+        enabled: Boolean,
+    ) {
+        context.settingsDataStore.edit { preferences ->
+            preferences[volumeKeyEnabledKey] = enabled
+        }
+    }
+
+    suspend fun setVibrationEnabled(
+        context: Context,
+        enabled: Boolean,
+    ) {
+        context.settingsDataStore.edit { preferences ->
+            preferences[vibrationEnabledKey] = enabled
         }
     }
 }
