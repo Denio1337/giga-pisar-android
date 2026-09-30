@@ -4,6 +4,8 @@ import android.content.Context
 import android.content.Intent
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.toggleable
@@ -19,14 +21,22 @@ import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.material.icons.outlined.RadioButtonChecked
 import androidx.compose.material.icons.outlined.Share
+import androidx.compose.material.icons.outlined.Translate
 import androidx.compose.material.icons.outlined.Vibration
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -35,6 +45,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import ru.gigapisar.R
+import ru.gigapisar.settings.AppLanguage
 import ru.gigapisar.settings.InsertionMode
 
 private const val SITE_URL = "https://gigapisar.github.io"
@@ -57,6 +68,7 @@ internal fun SettingsList(
     onRequestMicrophone: () -> Unit,
     onOpenAccessibilitySettings: () -> Unit,
     brainSection: @Composable () -> Unit = {},
+    onLanguageChanged: () -> Unit = {},
 ) {
     val context = LocalContext.current
     Column {
@@ -133,6 +145,7 @@ internal fun SettingsList(
         )
 
         SectionTitle(R.string.section_about)
+        LanguageRow(onLanguageChanged)
         InfoRow(
             icon = Icons.Outlined.Language,
             title = stringResource(R.string.about_site),
@@ -263,5 +276,55 @@ private fun share(context: Context) {
         context.startActivity(Intent.createChooser(send, null))
     } catch (_: Exception) {
         // Nothing can share text: nothing to do.
+    }
+}
+
+/** Interface language: the phone's own, Russian or English. A change restarts the screen in the new language. */
+@Composable
+private fun LanguageRow(onChanged: () -> Unit) {
+    val context = LocalContext.current
+    var open by remember { mutableStateOf(false) }
+    val current = AppLanguage.get(context)
+    val options =
+        listOf(
+            AppLanguage.SYSTEM to R.string.language_system,
+            AppLanguage.RUSSIAN to R.string.language_ru,
+            AppLanguage.ENGLISH to R.string.language_en,
+        )
+    ListItem(
+        headlineContent = { Text(stringResource(R.string.language)) },
+        supportingContent = { Text(stringResource(options.first { it.first == current }.second)) },
+        leadingContent = { Icon(Icons.Outlined.Translate, contentDescription = null) },
+        modifier = Modifier.clickable { open = true },
+    )
+    if (open) {
+        AlertDialog(
+            onDismissRequest = { open = false },
+            title = { Text(stringResource(R.string.language)) },
+            text = {
+                Column {
+                    for ((code, label) in options) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .selectable(selected = code == current, role = Role.RadioButton) {
+                                        open = false
+                                        if (code != current) {
+                                            AppLanguage.set(context, code)
+                                            onChanged()
+                                        }
+                                    }.padding(vertical = 10.dp),
+                        ) {
+                            RadioButton(selected = code == current, onClick = null)
+                            Text(stringResource(label), modifier = Modifier.padding(start = 16.dp))
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = { TextButton(onClick = { open = false }) { Text(stringResource(R.string.language_close)) } },
+        )
     }
 }

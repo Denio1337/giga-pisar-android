@@ -138,6 +138,7 @@ fun MainScreen(activity: ComponentActivity) {
                     onRequestMicrophone = requestMicrophone,
                     onOpenAccessibilitySettings = openAccessibilitySettings,
                     brainSection = { BrainRow(brain = brain, onOpen = { page = Page.BRAIN }) },
+                    onLanguageChanged = { activity.recreate() },
                 )
             }
         }

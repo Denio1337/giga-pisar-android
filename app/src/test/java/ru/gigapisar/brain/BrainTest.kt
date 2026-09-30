@@ -49,10 +49,13 @@ class BrainTest {
 
     @Test
     fun failureInPlainWords() {
+        java.util.Locale.setDefault(java.util.Locale.forLanguageTag("ru"))
         assertEquals("сервис не принял ключ", BrainClient.describeFailure(401, """{"error":{"message":"Invalid key"}}"""))
         assertEquals(
             "на счету сервиса нет денег или не подключена оплата API (это отдельно от подписки вроде ChatGPT Plus)",
             BrainClient.describeFailure(402, """{"error":{"message":"Insufficient Balance"}}"""),
         )
+        java.util.Locale.setDefault(java.util.Locale.ENGLISH)
+        assertEquals("the service rejected the key", BrainClient.describeFailure(401, "{}"))
     }
 }

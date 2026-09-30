@@ -35,10 +35,12 @@ import ru.gigapisar.brain.Brain
 import ru.gigapisar.brain.BrainException
 import ru.gigapisar.brain.BrainProviders
 import ru.gigapisar.brain.KeyVault
+import ru.gigapisar.brain.brainRussian
 import ru.gigapisar.insertion.TextInserter
 import ru.gigapisar.model.ModelManager
 import ru.gigapisar.overlay.OverlayManager
 import ru.gigapisar.overlay.RecordingPill
+import ru.gigapisar.settings.AppLanguage
 import ru.gigapisar.settings.InsertionMode
 import ru.gigapisar.settings.SettingsRepository
 import ru.gigapisar.speech.GigaAmOnnxRecognizer
@@ -349,7 +351,7 @@ class GigaPisarAccessibilityService : AccessibilityService() {
             ) != PackageManager.PERMISSION_GRANTED
         ) {
             notifyUser(
-                getString(
+                ui().getString(
                     R.string.microphone_required,
                 ),
             )
@@ -360,7 +362,7 @@ class GigaPisarAccessibilityService : AccessibilityService() {
 
         if (!modelManager.isInstalled()) {
             notifyUser(
-                getString(
+                ui().getString(
                     R.string.model_required,
                 ),
             )
@@ -372,7 +374,7 @@ class GigaPisarAccessibilityService : AccessibilityService() {
 
         if (!audioRecorder.start()) {
             notifyUser(
-                getString(
+                ui().getString(
                     R.string.audio_record_error,
                 ),
             )
@@ -437,7 +439,7 @@ class GigaPisarAccessibilityService : AccessibilityService() {
                         var insertion: TextInserter.Insertion? = null
                         if (text.isBlank()) {
                             notifyUser(
-                                getString(
+                                ui().getString(
                                     R.string.empty_transcription,
                                 ),
                             )
@@ -458,7 +460,7 @@ class GigaPisarAccessibilityService : AccessibilityService() {
 
                                     if (!inserted) {
                                         notifyUser(
-                                            getString(
+                                            ui().getString(
                                                 R.string.paste_failed,
                                             ),
                                         )
@@ -472,11 +474,11 @@ class GigaPisarAccessibilityService : AccessibilityService() {
                         val original = brained.original
                         if (brainFailure != null && text.isNotBlank()) {
                             // The text is in as recognized; say why the Brain did not edit it.
-                            notifyUser(getString(R.string.brain_failed, brainFailure), 6000)
+                            notifyUser(ui().getString(R.string.brain_failed, brainFailure), 6000)
                         } else if (inserted && original != null) {
                             offerUndo(text, original, insertion)
                         } else if (insertionMode == InsertionMode.CLIPBOARD && text.isNotBlank()) {
-                            notifyUser(getString(R.string.copied_to_clipboard))
+                            notifyUser(ui().getString(R.string.copied_to_clipboard))
                         }
                         overlay.setIdle()
                     }
@@ -489,7 +491,7 @@ class GigaPisarAccessibilityService : AccessibilityService() {
                                 ?: error.javaClass.simpleName
 
                         notifyUser(
-                            getString(
+                            ui().getString(
                                 R.string.transcription_error,
                                 message,
                             ),
@@ -529,7 +531,7 @@ class GigaPisarAccessibilityService : AccessibilityService() {
         } catch (error: BrainException) {
             BrainOutcome(body, failure = error.message ?: "")
         } catch (_: Exception) {
-            BrainOutcome(body, failure = getString(R.string.brain_failed_unknown))
+            BrainOutcome(body, failure = ui().getString(R.string.brain_failed_unknown))
         }
     }
 
@@ -548,8 +550,8 @@ class GigaPisarAccessibilityService : AccessibilityService() {
     ) {
         undoShownAt = SystemClock.uptimeMillis()
         pill.showAction(
-            getString(R.string.brain_done),
-            getString(R.string.brain_undo),
+            ui().getString(R.string.brain_done),
+            ui().getString(R.string.brain_undo),
             focusedFieldBounds(),
             UNDO_OFFER_MS,
         ) {
@@ -557,11 +559,20 @@ class GigaPisarAccessibilityService : AccessibilityService() {
             if (!restored) {
                 inserter.putToClipboard(original)
                 notifyUser(
-                    getString(if (insertion == null) R.string.brain_undo_clipboard else R.string.brain_undo_changed),
+                    ui().getString(if (insertion == null) R.string.brain_undo_clipboard else R.string.brain_undo_changed),
                     4000,
                 )
             }
         }
+    }
+
+    /**
+     * Strings in the language picked in the settings. Taken fresh each time: the service
+     * lives for days, and a language switched meanwhile should show up at once.
+     */
+    private fun ui(): Context {
+        brainRussian = AppLanguage.isRussian(this)
+        return AppLanguage.wrap(applicationContext)
     }
 
     override fun onInterrupt() {
