@@ -60,7 +60,7 @@
     <string name="floating_button_always">A round record button over other apps</string>
     <string name="floating_button_text_field">Shows up when a text field is open</string>
     <string name="volume_key">Record with the volume key</string>
-    <string name="volume_key_hint">Hold volume down and speak</string>
+    <string name="volume_key_hint">In a text field, hold volume down and speak. Elsewhere it just lowers the volume</string>
     <string name="vibration">Vibration</string>
     <string name="vibration_hint">A short buzz when recording starts and ends</string>
 
@@ -131,4 +131,8 @@
     <string name="update_allow_button">Continue installing</string>
     <string name="update_failed">Did not work: %1$s</string>
     <string name="update_bad_file">the file came down damaged, try again</string>
+    <string name="no_clipboard">Don\'t use the clipboard</string>
+    <string name="no_clipboard_hint">Direct insertion only. Where a field doesn\'t take it, Pisar offers to copy the text instead</string>
+    <string name="no_direct_insert">This field doesn\'t take text directly</string>
+    <string name="copy_text">Copy</string>
 </resources>

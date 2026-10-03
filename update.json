@@ -1,11 +1,11 @@
 {
-  "version": "0.2.2",
-  "versionCode": 11,
-  "url": "https://github.com/moznoazachem/giga-pisar-android/releases/download/v0.2.2/GigaPisar.apk",
-  "sha256": "81647657460dfbbb0e629d0a94e0bee39a01dd870604f3dfe1db86ea0f76d4ec",
-  "size": 58025216,
+  "version": "0.2.3",
+  "versionCode": 12,
+  "url": "https://github.com/moznoazachem/giga-pisar-android/releases/download/v0.2.3/GigaPisar.apk",
+  "sha256": "1c085c7ee26bfcc6ce1f1f5347a776ba7f68207feae2d2754b1c7385b1eb336c",
+  "size": 58027492,
   "notes": {
-    "ru": "Можно диктовать до 5 минут: длинная речь режется по паузам. Английский интерфейс и выбор языка в настройках. Писарь сам сообщает о новых версиях и обновляется по одной кнопке.",
-    "en": "Dictate up to 5 minutes: long speech is cut at pauses. English interface and a language choice in the settings. Pisar tells about new versions itself and updates with one button."
+    "ru": "Громкость запускает диктовку только в поле ввода, в остальных местах просто убавляет звук. Починена кнопка громкости на Vivo. Новый переключатель «Не использовать буфер обмена»: для телефонов, где вставка показывает всплывающее окно. Модель распознавания теперь качается с GitHub.",
+    "en": "The volume key starts dictation only in a text field; elsewhere it just lowers the volume. Fixed the volume key on Vivo. New switch \"Don't use the clipboard\" for phones where pasting shows a popup. The recognition model now downloads from GitHub."
   }
 }

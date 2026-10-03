@@ -46,11 +46,12 @@ class TextInserter(
     fun insertIntoFocusedField(
         fallbackNode: AccessibilityNodeInfo?,
         text: String,
+        allowPaste: Boolean = true,
     ): Insertion? {
         val node = findFocusedNode() ?: fallbackNode ?: return null
         return try {
             if (!node.isEditable || !node.isEnabled) return null
-            insertDirectly(node, text) ?: paste(node, text)
+            insertDirectly(node, text) ?: if (allowPaste) paste(node, text) else null
         } catch (_: Throwable) {
             null
         }
