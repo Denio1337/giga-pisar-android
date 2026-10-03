@@ -4,6 +4,7 @@ import ai.onnxruntime.OnnxTensor
 import ai.onnxruntime.OrtEnvironment
 import ai.onnxruntime.OrtSession
 import android.content.Context
+import ru.gigapisar.audio.AudioChunker
 import ru.gigapisar.audio.AudioRecorder
 import ru.gigapisar.model.ModelConfig
 import ru.gigapisar.model.ModelManager
@@ -26,11 +27,25 @@ class GigaAmOnnxRecognizer(
     private var session: OrtSession? = null
     private var vocabulary: List<String>? = null
 
+    /**
+     * Any length: a take longer than the model hears at once is cut at pauses into
+     * pieces of up to [CHUNK_SECONDS], recognized one by one and joined.
+     */
     @Synchronized
     fun transcribe(pcm: ShortArray): String {
         require(pcm.isNotEmpty()) {
             "Empty audio"
         }
+        val pieces = AudioChunker.bounds(pcm, AudioRecorder.SAMPLE_RATE, CHUNK_SECONDS)
+        if (pieces.size == 1) return transcribePiece(pcm)
+        return pieces
+            .map { range -> transcribePiece(pcm.copyOfRange(range.first, range.last + 1)).trim() }
+            .filter { it.isNotEmpty() }
+            .joinToString(" ")
+    }
+
+    private fun transcribePiece(pcm: ShortArray): String {
+        if (pcm.size < AudioRecorder.SAMPLE_RATE / 10) return ""
 
         require(
             pcm.size <=
@@ -595,5 +610,10 @@ class GigaAmOnnxRecognizer(
 
             return filters
         }
+    }
+
+    private companion object {
+        /** A little under the model's 25 seconds, so a cut at the limit never trips it. */
+        const val CHUNK_SECONDS = 24.0
     }
 }

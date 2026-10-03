@@ -15,7 +15,10 @@ class AudioRecorder(
 ) {
     companion object {
         const val SAMPLE_RATE = 16_000
-        private const val MAX_DURATION_MS = 25_000L
+
+        // Long takes are cut at pauses before recognition (see AudioChunker); five minutes
+        // keeps memory small (about 10 MB) and recognition well under a minute.
+        private const val MAX_DURATION_MS = 300_000L
 
         private const val CHANNEL_CONFIG =
             AudioFormat.CHANNEL_IN_MONO
