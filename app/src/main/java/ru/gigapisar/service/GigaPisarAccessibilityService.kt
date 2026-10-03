@@ -89,6 +89,7 @@ class GigaPisarAccessibilityService : AccessibilityService() {
     private var virtualButtonEnabled = true
     private var volumeKeyEnabled = true
     private var vibrationEnabled = true
+    private var noClipboard = false
 
     @Volatile
     private var brainSettings = SettingsRepository.BrainSettings()
@@ -186,6 +187,12 @@ class GigaPisarAccessibilityService : AccessibilityService() {
 
         serviceScope.launch {
             SettingsRepository
+                .noClipboard(this@GigaPisarAccessibilityService)
+                .collectLatest { enabled -> noClipboard = enabled }
+        }
+
+        serviceScope.launch {
+            SettingsRepository
                 .vibrationEnabled(this@GigaPisarAccessibilityService)
                 .collectLatest { enabled -> vibrationEnabled = enabled }
         }
@@ -213,6 +220,9 @@ class GigaPisarAccessibilityService : AccessibilityService() {
                     true
                 } else if (event.repeatCount != 0) {
                     false
+                } else if (insertionMode == InsertionMode.TEXT_FIELD && findFocusedEditable() == null) {
+                    // No text field open: the key is an ordinary volume key, Android handles it.
+                    false
                 } else {
                     volumeKeyPressed = true
                     volumeKeyHoldTriggered = false
@@ -238,11 +248,14 @@ class GigaPisarAccessibilityService : AccessibilityService() {
                         handleRecordingStop()
                     }
                 } else {
-                    // A short press is an ordinary volume-down: let Android pick the active
-                    // stream (music, call, ring), as it does without us.
-                    audioManager.adjustSuggestedStreamVolume(
+                    // A short press in a text field is an ordinary volume-down. The stream is named
+                    // outright: some firmwares (Vivo) ignore "let Android pick" from a service.
+                    val inCall =
+                        audioManager.mode == AudioManager.MODE_IN_CALL ||
+                            audioManager.mode == AudioManager.MODE_IN_COMMUNICATION
+                    audioManager.adjustStreamVolume(
+                        if (inCall) AudioManager.STREAM_VOICE_CALL else AudioManager.STREAM_MUSIC,
                         AudioManager.ADJUST_LOWER,
-                        AudioManager.USE_DEFAULT_STREAM_TYPE,
                         AudioManager.FLAG_SHOW_UI,
                     )
                 }
@@ -459,10 +472,18 @@ class GigaPisarAccessibilityService : AccessibilityService() {
                                 }
 
                                 InsertionMode.TEXT_FIELD -> {
-                                    insertion = inserter.insertIntoFocusedField(focusedNode, text)
+                                    insertion = inserter.insertIntoFocusedField(focusedNode, text, allowPaste = !noClipboard)
                                     inserted = insertion != null
 
-                                    if (!inserted) {
+                                    if (!inserted && noClipboard) {
+                                        // Without the clipboard this field cannot take the text; offer it on request.
+                                        pill.showAction(
+                                            ui().getString(R.string.no_direct_insert),
+                                            ui().getString(R.string.copy_text),
+                                            focusedFieldBounds(),
+                                            8000,
+                                        ) { inserter.putToClipboard(text) }
+                                    } else if (!inserted) {
                                         notifyUser(
                                             ui().getString(
                                                 R.string.paste_failed,

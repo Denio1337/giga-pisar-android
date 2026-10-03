@@ -60,7 +60,7 @@
     <string name="floating_button_always">Круглая кнопка записи поверх приложений</string>
     <string name="floating_button_text_field">Появляется, когда открыто поле ввода</string>
     <string name="volume_key">Запись кнопкой громкости</string>
-    <string name="volume_key_hint">Зажмите громкость вниз и говорите</string>
+    <string name="volume_key_hint">В поле ввода зажмите громкость вниз и говорите. Вне поля она просто убавляет звук</string>
     <string name="vibration">Вибрация</string>
     <string name="vibration_hint">Коротко в начале и в конце записи</string>
 
@@ -131,4 +131,8 @@
     <string name="update_allow_button">Продолжить установку</string>
     <string name="update_failed">Не получилось: %1$s</string>
     <string name="update_bad_file">файл скачался с ошибкой, попробуйте ещё раз</string>
+    <string name="no_clipboard">Не использовать буфер обмена</string>
+    <string name="no_clipboard_hint">Только прямая вставка. Где поле её не принимает, Писарь предложит скопировать текст сам</string>
+    <string name="no_direct_insert">Это поле не принимает текст напрямую</string>
+    <string name="copy_text">Скопировать</string>
 </resources>

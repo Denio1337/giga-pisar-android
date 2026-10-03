@@ -15,6 +15,7 @@ import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.AccessibilityNew
 import androidx.compose.material.icons.outlined.Code
 import androidx.compose.material.icons.outlined.ContentPaste
+import androidx.compose.material.icons.outlined.ContentPasteOff
 import androidx.compose.material.icons.outlined.EditNote
 import androidx.compose.material.icons.outlined.GraphicEq
 import androidx.compose.material.icons.outlined.Language
@@ -59,12 +60,14 @@ internal fun SettingsList(
     virtualButtonVisible: Boolean,
     volumeKeyEnabled: Boolean,
     vibrationEnabled: Boolean,
+    noClipboard: Boolean = false,
     microphoneGranted: Boolean,
     accessibilityEnabled: Boolean,
     onInsertionMode: (InsertionMode) -> Unit,
     onVirtualButton: (Boolean) -> Unit,
     onVolumeKey: (Boolean) -> Unit,
     onVibration: (Boolean) -> Unit,
+    onNoClipboard: (Boolean) -> Unit = {},
     onRequestMicrophone: () -> Unit,
     onOpenAccessibilitySettings: () -> Unit,
     brainSection: @Composable () -> Unit = {},
@@ -115,6 +118,16 @@ internal fun SettingsList(
             selected = insertionMode == InsertionMode.CLIPBOARD,
             onClick = { onInsertionMode(InsertionMode.CLIPBOARD) },
         )
+
+        if (insertionMode == InsertionMode.TEXT_FIELD) {
+            SwitchRow(
+                icon = Icons.Outlined.ContentPasteOff,
+                title = R.string.no_clipboard,
+                subtitle = R.string.no_clipboard_hint,
+                checked = noClipboard,
+                onChange = onNoClipboard,
+            )
+        }
 
         brainSection()
 

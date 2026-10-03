@@ -45,6 +45,7 @@ fun MainScreen(activity: ComponentActivity) {
     var virtualButtonVisible by remember { mutableStateOf(true) }
     var volumeKeyEnabled by remember { mutableStateOf(true) }
     var vibrationEnabled by remember { mutableStateOf(true) }
+    var noClipboard by remember { mutableStateOf(false) }
     var brain by remember { mutableStateOf(SettingsRepository.BrainSettings()) }
     var page by rememberSaveable { mutableStateOf(Page.MAIN) }
     var modelInstalled by remember { mutableStateOf(ModelManager(context).isInstalled()) }
@@ -77,6 +78,9 @@ fun MainScreen(activity: ComponentActivity) {
     }
     LaunchedEffect(context) {
         SettingsRepository.vibrationEnabled(context).collect { vibrationEnabled = it }
+    }
+    LaunchedEffect(context) {
+        SettingsRepository.noClipboard(context).collect { noClipboard = it }
     }
     LaunchedEffect(context) {
         SettingsRepository.brain(context).collect { brain = it }
@@ -137,6 +141,8 @@ fun MainScreen(activity: ComponentActivity) {
                     onVirtualButton = { scope.launch { SettingsRepository.setVirtualButtonVisible(context, it) } },
                     onVolumeKey = { scope.launch { SettingsRepository.setVolumeKeyEnabled(context, it) } },
                     onVibration = { scope.launch { SettingsRepository.setVibrationEnabled(context, it) } },
+                    noClipboard = noClipboard,
+                    onNoClipboard = { scope.launch { SettingsRepository.setNoClipboard(context, it) } },
                     onRequestMicrophone = requestMicrophone,
                     onOpenAccessibilitySettings = openAccessibilitySettings,
                     brainSection = { BrainRow(brain = brain, onOpen = { page = Page.BRAIN }) },

@@ -27,6 +27,9 @@ object SettingsRepository {
     private val volumeKeyEnabledKey =
         booleanPreferencesKey("volume_key_enabled")
 
+    private val noClipboardKey =
+        booleanPreferencesKey("no_clipboard")
+
     private val vibrationEnabledKey =
         booleanPreferencesKey("vibration_enabled")
 
@@ -74,6 +77,19 @@ object SettingsRepository {
         context.settingsDataStore.data.map { preferences ->
             preferences[volumeKeyEnabledKey] ?: true
         }
+
+    /** Never paste through the clipboard: where a field does not take text directly, say so instead. */
+    fun noClipboard(context: Context): Flow<Boolean> =
+        context.settingsDataStore.data.map { preferences ->
+            preferences[noClipboardKey] ?: false
+        }
+
+    suspend fun setNoClipboard(
+        context: Context,
+        enabled: Boolean,
+    ) {
+        context.settingsDataStore.edit { it[noClipboardKey] = enabled }
+    }
 
     fun vibrationEnabled(context: Context): Flow<Boolean> =
         context.settingsDataStore.data.map { preferences ->
