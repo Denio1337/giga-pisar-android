@@ -88,8 +88,8 @@ class ModelManager(
             vocabFile.delete()
 
             try {
-                downloadFile(
-                    url = ModelConfig.MODEL_URL,
+                downloadFromMirrors(
+                    urls = ModelConfig.MODEL_URLS,
                     destination = modelPart,
                     expectedSha256 = ModelConfig.MODEL_SHA256,
                     onProgress = onProgress,
@@ -104,10 +104,10 @@ class ModelManager(
                     modelFile,
                 )
 
-                downloadFile(
-                    url = ModelConfig.VOCAB_URL,
+                downloadFromMirrors(
+                    urls = ModelConfig.VOCAB_URLS,
                     destination = vocabPart,
-                    expectedSha256 = null,
+                    expectedSha256 = ModelConfig.VOCAB_SHA256,
                     onProgress = {},
                 )
 
@@ -177,6 +177,28 @@ class ModelManager(
                 }
             }
         }
+    }
+
+    /** Tries each address in turn; the last one's error is the one reported. */
+    private suspend fun downloadFromMirrors(
+        urls: List<String>,
+        destination: File,
+        expectedSha256: String?,
+        onProgress: suspend (Int) -> Unit,
+    ) {
+        var lastError: Throwable? = null
+        for (url in urls) {
+            try {
+                destination.delete()
+                downloadFile(url = url, destination = destination, expectedSha256 = expectedSha256, onProgress = onProgress)
+                return
+            } catch (error: kotlinx.coroutines.CancellationException) {
+                throw error
+            } catch (error: Throwable) {
+                lastError = error
+            }
+        }
+        throw lastError ?: IllegalStateException("No download address")
     }
 
     private suspend fun downloadFile(
