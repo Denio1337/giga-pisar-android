@@ -43,6 +43,7 @@ data class UpdateInfo(
  */
 object Updates {
     private const val MANIFEST_URL = "https://raw.githubusercontent.com/moznoazachem/giga-pisar-android/main/update.json"
+    private const val TRUSTED_PREFIX = "https://github.com/moznoazachem/giga-pisar-android/releases/download/"
     private const val PREFS = "giga_pisar_updates"
     private const val CHANNEL = "updates"
     private const val NOTIFICATION_ID = 7001
@@ -67,7 +68,8 @@ object Updates {
     fun pending(context: Context): UpdateInfo? {
         val raw = prefs(context).getString("latest", null) ?: return null
         val info = runCatching { parse(JSONObject(raw)) }.getOrNull() ?: return null
-        return info.takeIf { it.versionCode > installedCode(context) }
+        // APKs come only from this repository's releases.
+        return info.takeIf { it.versionCode > installedCode(context) && it.url.startsWith(TRUSTED_PREFIX) }
     }
 
     /** Whether it is time for another look (the service and the app share the clock). */

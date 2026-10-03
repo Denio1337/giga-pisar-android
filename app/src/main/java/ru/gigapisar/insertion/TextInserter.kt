@@ -1,12 +1,14 @@
 package ru.gigapisar.insertion
 
 import android.content.ClipData
+import android.content.ClipDescription
 import android.content.ClipboardManager
 import android.content.Context
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.PersistableBundle
 import android.view.accessibility.AccessibilityNodeInfo
 import ru.gigapisar.R
 
@@ -16,18 +18,36 @@ class TextInserter(
     private val mainHandler =
         Handler(Looper.getMainLooper())
 
-    fun putToClipboard(text: String) {
+    /**
+     * Puts [text] on the clipboard. A [transient] clip is only there to be pasted: it is marked
+     * sensitive, so Android shows no preview of it and keyboards keep it out of their history.
+     */
+    fun putToClipboard(
+        text: String,
+        transient: Boolean = false,
+    ) {
         val clipboard =
             context.getSystemService(
                 Context.CLIPBOARD_SERVICE,
             ) as ClipboardManager
 
-        clipboard.setPrimaryClip(
-            ClipData.newPlainText(
-                context.getString(R.string.clipboard_label),
-                text,
-            ),
-        )
+        val clip = ClipData.newPlainText(context.getString(R.string.clipboard_label), text)
+        if (transient) {
+            clip.description.extras =
+                PersistableBundle().apply {
+                    putBoolean(
+                        if (Build.VERSION.SDK_INT >=
+                            Build.VERSION_CODES.TIRAMISU
+                        ) {
+                            ClipDescription.EXTRA_IS_SENSITIVE
+                        } else {
+                            "android.content.extra.IS_SENSITIVE"
+                        },
+                        true,
+                    )
+                }
+        }
+        clipboard.setPrimaryClip(clip)
     }
 
     /** Where a dictation went in: the field and the offset of the text, so it can be swapped back. */
@@ -111,9 +131,10 @@ class TextInserter(
         val current = fieldText(node)
         val selStart = node.textSelectionStart
         val start = if (selStart in 0..current.length) selStart else current.length
-        putToClipboard(text)
-        if (!node.performAction(AccessibilityNodeInfo.ACTION_PASTE)) return null
+        putToClipboard(text, transient = true)
+        // Cleared either way: a failed paste must not leave the dictation on the clipboard.
         mainHandler.postDelayed(::clearClipboard, CLIPBOARD_CLEAR_DELAY_MS)
+        if (!node.performAction(AccessibilityNodeInfo.ACTION_PASTE)) return null
         return Insertion(node, start)
     }
 
@@ -147,9 +168,11 @@ class TextInserter(
     }
 
     private fun clearClipboard() {
+        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
             clipboard.clearPrimaryClip()
+        } else {
+            clipboard.setPrimaryClip(ClipData.newPlainText("", ""))
         }
     }
 
