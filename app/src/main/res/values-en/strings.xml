@@ -122,4 +122,13 @@
     <string name="language_ru">Русский</string>
     <string name="language_en">English</string>
     <string name="language_close">Close</string>
+    <string name="update_channel">Updates</string>
+    <string name="update_title">Version %1$s is out</string>
+    <string name="update_tap">Tap to update</string>
+    <string name="update_button">Update</string>
+    <string name="update_downloading">Downloading: %1$d%%</string>
+    <string name="update_allow_install">Let Pisar install apps: needed once. Then come back here.</string>
+    <string name="update_allow_button">Continue installing</string>
+    <string name="update_failed">Did not work: %1$s</string>
+    <string name="update_bad_file">the file came down damaged, try again</string>
 </resources>

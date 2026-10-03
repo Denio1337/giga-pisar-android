@@ -44,6 +44,7 @@ import ru.gigapisar.settings.AppLanguage
 import ru.gigapisar.settings.InsertionMode
 import ru.gigapisar.settings.SettingsRepository
 import ru.gigapisar.speech.GigaAmOnnxRecognizer
+import ru.gigapisar.update.Updates
 
 class GigaPisarAccessibilityService : AccessibilityService() {
     private val serviceScope =
@@ -138,6 +139,9 @@ class GigaPisarAccessibilityService : AccessibilityService() {
 
         pill =
             RecordingPill(this)
+
+        // A minute after start: the phone has settled and has network by then.
+        mainHandler.postDelayed(updateCheck, 60_000)
 
         overlay =
             OverlayManager(
@@ -575,6 +579,22 @@ class GigaPisarAccessibilityService : AccessibilityService() {
         return AppLanguage.wrap(applicationContext)
     }
 
+    /** A look for a new version at start and then every few hours, while the service lives. */
+    private val updateCheck =
+        object : Runnable {
+            override fun run() {
+                if (Updates.due(this@GigaPisarAccessibilityService)) {
+                    serviceScope.launch(Dispatchers.IO) {
+                        Updates
+                            .check(
+                                this@GigaPisarAccessibilityService,
+                            )?.let { Updates.notifyOnce(this@GigaPisarAccessibilityService, it) }
+                    }
+                }
+                mainHandler.postDelayed(this, UPDATE_TICK_MS)
+            }
+        }
+
     override fun onInterrupt() {
         cancelVolumeKeyGesture()
         recording = false
@@ -584,6 +604,7 @@ class GigaPisarAccessibilityService : AccessibilityService() {
     }
 
     override fun onDestroy() {
+        mainHandler.removeCallbacks(updateCheck)
         cancelVolumeKeyGesture()
         recording = false
 
@@ -710,6 +731,9 @@ class GigaPisarAccessibilityService : AccessibilityService() {
     companion object {
         // An ordinary tap lasts 100-200 ms; recording starts only on a deliberate hold.
         private const val VOLUME_RECORDING_HOLD_DELAY_MS = 350L
+
+        /** How often the service wakes to see whether a new version is due (the check itself runs every 6 hours). */
+        private const val UPDATE_TICK_MS = 60 * 60 * 1000L
 
         /** How long "Вернуть" stays offered after a Brain edit. */
         private const val UNDO_OFFER_MS = 6000L
