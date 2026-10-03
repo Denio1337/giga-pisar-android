@@ -1,11 +1,11 @@
 {
-  "version": "0.2.3",
-  "versionCode": 12,
-  "url": "https://github.com/moznoazachem/giga-pisar-android/releases/download/v0.2.3/GigaPisar.apk",
-  "sha256": "1c085c7ee26bfcc6ce1f1f5347a776ba7f68207feae2d2754b1c7385b1eb336c",
-  "size": 58027492,
+  "version": "0.2.4",
+  "versionCode": 13,
+  "url": "https://github.com/moznoazachem/giga-pisar-android/releases/download/v0.2.4/GigaPisar.apk",
+  "sha256": "64f2a6fecfdda5db72baea7e8a5245b4c3d8ff29b35195871fc2b0fb3fd4a6c8",
+  "size": 58028416,
   "notes": {
-    "ru": "Громкость запускает диктовку только в поле ввода, в остальных местах просто убавляет звук. Починена кнопка громкости на Vivo. Новый переключатель «Не использовать буфер обмена»: для телефонов, где вставка показывает всплывающее окно. Модель распознавания теперь качается с GitHub.",
-    "en": "The volume key starts dictation only in a text field; elsewhere it just lowers the volume. Fixed the volume key on Vivo. New switch \"Don't use the clipboard\" for phones where pasting shows a popup. The recognition model now downloads from GitHub."
+    "ru": "Безопасность: в поле пароля надиктованное не уходит в облачный Мозг, надиктованный текст не остаётся в буфере обмена и не попадает в историю буфера клавиатуры, обновления берутся только с нашей страницы на GitHub.",
+    "en": "Security: dictation into a password field never goes to the cloud Brain, dictated text does not stay on the clipboard or in the keyboard's clipboard history, updates come only from our GitHub page."
   }
 }

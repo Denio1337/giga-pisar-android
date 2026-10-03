@@ -445,7 +445,8 @@ class GigaPisarAccessibilityService : AccessibilityService() {
                         recognizer.transcribe(
                             audio,
                         )
-                    val brained = applyBrain(recognized)
+                    // A password is never sent to a cloud service.
+                    val brained = if (focusedNode?.isPassword == true) BrainOutcome(recognized) else applyBrain(recognized)
                     val text = brained.text
                     val brainFailure = brained.failure
 
@@ -475,20 +476,14 @@ class GigaPisarAccessibilityService : AccessibilityService() {
                                     insertion = inserter.insertIntoFocusedField(focusedNode, text, allowPaste = !noClipboard)
                                     inserted = insertion != null
 
-                                    if (!inserted && noClipboard) {
-                                        // Without the clipboard this field cannot take the text; offer it on request.
+                                    if (!inserted) {
+                                        // The text did not go in: it is not left on the clipboard, it is offered on request.
                                         pill.showAction(
-                                            ui().getString(R.string.no_direct_insert),
+                                            ui().getString(if (noClipboard) R.string.no_direct_insert else R.string.paste_failed),
                                             ui().getString(R.string.copy_text),
                                             focusedFieldBounds(),
                                             8000,
                                         ) { inserter.putToClipboard(text) }
-                                    } else if (!inserted) {
-                                        notifyUser(
-                                            ui().getString(
-                                                R.string.paste_failed,
-                                            ),
-                                        )
                                     } else if (brainFailure == null && brained.original == null) {
                                         pill.hide()
                                     }
