@@ -35,13 +35,16 @@ import ru.gigapisar.brain.Brain
 import ru.gigapisar.brain.BrainException
 import ru.gigapisar.brain.BrainProviders
 import ru.gigapisar.brain.KeyVault
+import ru.gigapisar.brain.brainRussian
 import ru.gigapisar.insertion.TextInserter
 import ru.gigapisar.model.ModelManager
 import ru.gigapisar.overlay.OverlayManager
 import ru.gigapisar.overlay.RecordingPill
+import ru.gigapisar.settings.AppLanguage
 import ru.gigapisar.settings.InsertionMode
 import ru.gigapisar.settings.SettingsRepository
 import ru.gigapisar.speech.GigaAmOnnxRecognizer
+import ru.gigapisar.update.Updates
 
 class GigaPisarAccessibilityService : AccessibilityService() {
     private val serviceScope =
@@ -136,6 +139,9 @@ class GigaPisarAccessibilityService : AccessibilityService() {
 
         pill =
             RecordingPill(this)
+
+        // A minute after start: the phone has settled and has network by then.
+        mainHandler.postDelayed(updateCheck, 60_000)
 
         overlay =
             OverlayManager(
@@ -349,7 +355,7 @@ class GigaPisarAccessibilityService : AccessibilityService() {
             ) != PackageManager.PERMISSION_GRANTED
         ) {
             notifyUser(
-                getString(
+                ui().getString(
                     R.string.microphone_required,
                 ),
             )
@@ -360,7 +366,7 @@ class GigaPisarAccessibilityService : AccessibilityService() {
 
         if (!modelManager.isInstalled()) {
             notifyUser(
-                getString(
+                ui().getString(
                     R.string.model_required,
                 ),
             )
@@ -372,7 +378,7 @@ class GigaPisarAccessibilityService : AccessibilityService() {
 
         if (!audioRecorder.start()) {
             notifyUser(
-                getString(
+                ui().getString(
                     R.string.audio_record_error,
                 ),
             )
@@ -437,7 +443,7 @@ class GigaPisarAccessibilityService : AccessibilityService() {
                         var insertion: TextInserter.Insertion? = null
                         if (text.isBlank()) {
                             notifyUser(
-                                getString(
+                                ui().getString(
                                     R.string.empty_transcription,
                                 ),
                             )
@@ -458,7 +464,7 @@ class GigaPisarAccessibilityService : AccessibilityService() {
 
                                     if (!inserted) {
                                         notifyUser(
-                                            getString(
+                                            ui().getString(
                                                 R.string.paste_failed,
                                             ),
                                         )
@@ -472,11 +478,11 @@ class GigaPisarAccessibilityService : AccessibilityService() {
                         val original = brained.original
                         if (brainFailure != null && text.isNotBlank()) {
                             // The text is in as recognized; say why the Brain did not edit it.
-                            notifyUser(getString(R.string.brain_failed, brainFailure), 6000)
+                            notifyUser(ui().getString(R.string.brain_failed, brainFailure), 6000)
                         } else if (inserted && original != null) {
                             offerUndo(text, original, insertion)
                         } else if (insertionMode == InsertionMode.CLIPBOARD && text.isNotBlank()) {
-                            notifyUser(getString(R.string.copied_to_clipboard))
+                            notifyUser(ui().getString(R.string.copied_to_clipboard))
                         }
                         overlay.setIdle()
                     }
@@ -489,7 +495,7 @@ class GigaPisarAccessibilityService : AccessibilityService() {
                                 ?: error.javaClass.simpleName
 
                         notifyUser(
-                            getString(
+                            ui().getString(
                                 R.string.transcription_error,
                                 message,
                             ),
@@ -529,7 +535,7 @@ class GigaPisarAccessibilityService : AccessibilityService() {
         } catch (error: BrainException) {
             BrainOutcome(body, failure = error.message ?: "")
         } catch (_: Exception) {
-            BrainOutcome(body, failure = getString(R.string.brain_failed_unknown))
+            BrainOutcome(body, failure = ui().getString(R.string.brain_failed_unknown))
         }
     }
 
@@ -548,8 +554,8 @@ class GigaPisarAccessibilityService : AccessibilityService() {
     ) {
         undoShownAt = SystemClock.uptimeMillis()
         pill.showAction(
-            getString(R.string.brain_done),
-            getString(R.string.brain_undo),
+            ui().getString(R.string.brain_done),
+            ui().getString(R.string.brain_undo),
             focusedFieldBounds(),
             UNDO_OFFER_MS,
         ) {
@@ -557,12 +563,37 @@ class GigaPisarAccessibilityService : AccessibilityService() {
             if (!restored) {
                 inserter.putToClipboard(original)
                 notifyUser(
-                    getString(if (insertion == null) R.string.brain_undo_clipboard else R.string.brain_undo_changed),
+                    ui().getString(if (insertion == null) R.string.brain_undo_clipboard else R.string.brain_undo_changed),
                     4000,
                 )
             }
         }
     }
+
+    /**
+     * Strings in the language picked in the settings. Taken fresh each time: the service
+     * lives for days, and a language switched meanwhile should show up at once.
+     */
+    private fun ui(): Context {
+        brainRussian = AppLanguage.isRussian(this)
+        return AppLanguage.wrap(applicationContext)
+    }
+
+    /** A look for a new version at start and then every few hours, while the service lives. */
+    private val updateCheck =
+        object : Runnable {
+            override fun run() {
+                if (Updates.due(this@GigaPisarAccessibilityService)) {
+                    serviceScope.launch(Dispatchers.IO) {
+                        Updates
+                            .check(
+                                this@GigaPisarAccessibilityService,
+                            )?.let { Updates.notifyOnce(this@GigaPisarAccessibilityService, it) }
+                    }
+                }
+                mainHandler.postDelayed(this, UPDATE_TICK_MS)
+            }
+        }
 
     override fun onInterrupt() {
         cancelVolumeKeyGesture()
@@ -573,6 +604,7 @@ class GigaPisarAccessibilityService : AccessibilityService() {
     }
 
     override fun onDestroy() {
+        mainHandler.removeCallbacks(updateCheck)
         cancelVolumeKeyGesture()
         recording = false
 
@@ -699,6 +731,9 @@ class GigaPisarAccessibilityService : AccessibilityService() {
     companion object {
         // An ordinary tap lasts 100-200 ms; recording starts only on a deliberate hold.
         private const val VOLUME_RECORDING_HOLD_DELAY_MS = 350L
+
+        /** How often the service wakes to see whether a new version is due (the check itself runs every 6 hours). */
+        private const val UPDATE_TICK_MS = 60 * 60 * 1000L
 
         /** How long "Вернуть" stays offered after a Brain edit. */
         private const val UNDO_OFFER_MS = 6000L

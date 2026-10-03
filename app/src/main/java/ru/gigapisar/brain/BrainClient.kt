@@ -6,6 +6,17 @@ import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.SocketTimeoutException
 import java.net.URL
+import java.util.Locale
+
+/** Russian on a Russian phone, English otherwise, like the rest of the interface. */
+internal fun say(
+    ru: String,
+    en: String,
+): String = if (brainRussian ?: (Locale.getDefault().language == "ru")) ru else en
+
+/** Set from the app's language setting; null means follow the phone. */
+@Volatile
+var brainRussian: Boolean? = null
 
 /** A failure the person can act on, already in plain words. */
 class BrainException(
@@ -111,9 +122,11 @@ object BrainClient {
             val text = stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() } ?: ""
             return status to text
         } catch (_: SocketTimeoutException) {
-            throw BrainException("сервис не ответил за ${timeoutMs / 1000} секунд")
+            throw BrainException(
+                say("сервис не ответил за ${timeoutMs / 1000} секунд", "the service did not answer within ${timeoutMs / 1000} seconds"),
+            )
         } catch (_: IOException) {
-            throw BrainException("нет связи с сервисом, проверьте интернет")
+            throw BrainException(say("нет связи с сервисом, проверьте интернет", "cannot reach the service, check the connection"))
         } finally {
             connection.disconnect()
         }
@@ -132,7 +145,7 @@ object BrainClient {
                     .getJSONObject("message")
                     .getString("content")
             } catch (_: Exception) {
-                throw BrainException("сервис ответил непонятно")
+                throw BrainException(say("сервис ответил непонятно", "the service gave an unreadable answer"))
             }
         // A model that still thought aloud: keep only the answer.
         val think = answer.indexOf("</think>")
@@ -163,15 +176,20 @@ object BrainClient {
         val m = (serverMessage(body) + " " + body).lowercase()
         return when {
             status == 402 || listOf("insufficient_quota", "quota", "billing", "balance", "credit", "payment").any { it in m } ->
-                "на счету сервиса нет денег или не подключена оплата API (это отдельно от подписки вроде ChatGPT Plus)"
-            listOf("country", "region", "territory", "location").any { it in m } -> "сервис недоступен из вашей страны"
-            status == 401 -> "сервис не принял ключ"
-            status == 403 -> "у ключа нет доступа к этой модели или сервису"
+                say(
+                    "на счету сервиса нет денег или не подключена оплата API (это отдельно от подписки вроде ChatGPT Plus)",
+                    "no money on the service account or API billing is not set up (separate from subscriptions like ChatGPT Plus)",
+                )
+            listOf("country", "region", "territory", "location").any {
+                it in m
+            } -> say("сервис недоступен из вашей страны", "the service is not available in your country")
+            status == 401 -> say("сервис не принял ключ", "the service rejected the key")
+            status == 403 -> say("у ключа нет доступа к этой модели или сервису", "the key has no access to this model or service")
             status == 404 || ("model" in m && ("not found" in m || "not exist" in m)) ->
-                "модель недоступна для этого ключа, выберите другую"
-            status == 429 -> "слишком много запросов, попробуйте через минуту"
-            status >= 500 -> "у сервиса сбой (ошибка $status), попробуйте позже"
-            else -> "сервис ответил ошибкой $status"
+                say("модель недоступна для этого ключа, выберите другую", "the model is not available for this key, pick another one")
+            status == 429 -> say("слишком много запросов, попробуйте через минуту", "too many requests, try again in a minute")
+            status >= 500 -> say("у сервиса сбой (ошибка $status), попробуйте позже", "the service is failing (error $status), try later")
+            else -> say("сервис ответил ошибкой $status", "the service answered with error $status")
         }
     }
 }

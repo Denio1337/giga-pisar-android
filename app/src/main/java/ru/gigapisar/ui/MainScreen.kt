@@ -119,6 +119,8 @@ fun MainScreen(activity: ComponentActivity) {
                     }
                     return@Column
                 }
+                UpdateBanner(modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp))
+                AskNotificationsOnce()
                 ReadyCard(
                     volumeKeyEnabled = volumeKeyEnabled,
                     buttonEnabled = virtualButtonVisible,
@@ -138,6 +140,7 @@ fun MainScreen(activity: ComponentActivity) {
                     onRequestMicrophone = requestMicrophone,
                     onOpenAccessibilitySettings = openAccessibilitySettings,
                     brainSection = { BrainRow(brain = brain, onOpen = { page = Page.BRAIN }) },
+                    onLanguageChanged = { activity.recreate() },
                 )
             }
         }
@@ -179,3 +182,21 @@ private fun Header() {
 
 /** The app has two pages: the settings list and the Brain page opened from it. */
 private enum class Page { MAIN, BRAIN }
+
+/**
+ * Android 13+ shows notifications only with permission. Asked once, when the app is set
+ * up: that is how a new version can be told about while Pisar is closed.
+ */
+@Composable
+private fun AskNotificationsOnce() {
+    if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.TIRAMISU) return
+    val context = LocalContext.current
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
+    LaunchedEffect(Unit) {
+        val prefs = context.getSharedPreferences("giga_pisar_updates", android.content.Context.MODE_PRIVATE)
+        if (!prefs.getBoolean("askedNotifications", false)) {
+            prefs.edit().putBoolean("askedNotifications", true).apply()
+            launcher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
+}

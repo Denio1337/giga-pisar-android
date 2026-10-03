@@ -1,0 +1,11 @@
+{
+  "version": "0.2.2",
+  "versionCode": 11,
+  "url": "https://github.com/moznoazachem/giga-pisar-android/releases/download/v0.2.2/GigaPisar.apk",
+  "sha256": "81647657460dfbbb0e629d0a94e0bee39a01dd870604f3dfe1db86ea0f76d4ec",
+  "size": 58025216,
+  "notes": {
+    "ru": "Можно диктовать до 5 минут: длинная речь режется по паузам. Английский интерфейс и выбор языка в настройках. Писарь сам сообщает о новых версиях и обновляется по одной кнопке.",
+    "en": "Dictate up to 5 minutes: long speech is cut at pauses. English interface and a language choice in the settings. Pisar tells about new versions itself and updates with one button."
+  }
+}

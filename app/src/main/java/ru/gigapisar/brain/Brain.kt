@@ -113,11 +113,13 @@ object Brain {
         val answer = BrainClient.complete(provider, key, model, prompt, body, timeout)
         // A sane answer is about as long as the text; anything far longer is not an edit.
         if (answer.length > maxOf(4000, body.length * 4)) {
-            throw BrainException("ответ нейросети подозрительно длинный, вставлять не стал")
+            throw BrainException(
+                say("ответ нейросети подозрительно длинный, вставлять не стал", "the model's answer is suspiciously long, not inserted"),
+            )
         }
-        if (answer.isBlank()) throw BrainException("нейросеть вернула пустой ответ")
+        if (answer.isBlank()) throw BrainException(say("нейросеть вернула пустой ответ", "the model returned an empty answer"))
         if (command == null && looksLikeRefusal(answer, body)) {
-            throw BrainException("нейросеть ответила не по делу")
+            throw BrainException(say("нейросеть ответила не по делу", "the model answered off the point"))
         }
         return answer
     }

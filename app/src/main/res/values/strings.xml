@@ -117,4 +117,18 @@
     <string name="brain_undo">Вернуть</string>
     <string name="brain_undo_changed">Поле уже изменилось. Исходный текст в буфере обмена</string>
     <string name="brain_undo_clipboard">Исходный текст в буфере обмена</string>
+    <string name="language">Язык</string>
+    <string name="language_system">Как в системе</string>
+    <string name="language_ru">Русский</string>
+    <string name="language_en">English</string>
+    <string name="language_close">Закрыть</string>
+    <string name="update_channel">Обновления</string>
+    <string name="update_title">Вышла версия %1$s</string>
+    <string name="update_tap">Нажмите, чтобы обновить</string>
+    <string name="update_button">Обновить</string>
+    <string name="update_downloading">Скачиваю: %1$d%%</string>
+    <string name="update_allow_install">Разрешите Писарю устанавливать приложения: это нужно один раз. Потом вернитесь сюда.</string>
+    <string name="update_allow_button">Продолжить установку</string>
+    <string name="update_failed">Не получилось: %1$s</string>
+    <string name="update_bad_file">файл скачался с ошибкой, попробуйте ещё раз</string>
 </resources>

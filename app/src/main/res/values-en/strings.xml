@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <string name="app_name">Giga Pisar</string>
+
+    <string name="accessibility_description">
+        Shows a voice input button over text fields and starts recording when you hold the volume down key.
+    </string>
+
+    <string name="clipboard_label">Giga Pisar</string>
+    <string name="mode_clipboard">To the clipboard</string>
+    <string name="mode_text_field">Straight into the field</string>
+    <string name="microphone">Microphone</string>
+    <string name="permission_granted">Allowed</string>
+    <string name="permission_denied">Not allowed, tap to allow</string>
+
+    <string name="accessibility_service">Accessibility</string>
+    <string name="service_enabled">On</string>
+    <string name="service_disabled">Off, tap to turn on</string>
+
+    <string name="model_name">GigaAM v3 model</string>
+    <string name="downloading_model">Downloading the model: %1$d%%</string>
+    <string name="download_error">Download failed: %1$s</string>
+    <string name="model_verification_failed">The model downloaded but did not pass the check</string>
+
+    <string name="model_required">Download the GigaAM model first</string>
+    <string name="microphone_required">No permission to use the microphone</string>
+    <string name="recording_too_short">The recording is too short</string>
+    <string name="copied_to_clipboard">Text is in the clipboard</string>
+    <string name="transcription_error">Recognition failed: %1$s</string>
+    <string name="empty_transcription">Recognition returned no text</string>
+    <string name="paste_failed">Could not put the text into the field</string>
+    <string name="audio_record_error">Could not access the microphone</string>
+
+    <string name="button_idle">Voice input</string>
+    <string name="button_recording">Recording</string>
+    <string name="button_processing">Recognizing</string>
+
+    <string name="setup_step">Step %1$d of 3</string>
+    <string name="setup_mic_title">Allow the microphone</string>
+    <string name="setup_mic_text">Pisar listens only while you hold the button. Nothing is sent anywhere: speech is recognized on the phone.</string>
+    <string name="setup_mic_button">Allow</string>
+    <string name="setup_access_title">Turn on Giga Pisar in Accessibility</string>
+    <string name="setup_access_text">This lets Pisar notice the volume down key and put text into the field. Find “Giga Pisar” in the list of services and turn it on.</string>
+    <string name="setup_access_button">Open settings</string>
+    <string name="setup_access_hint">If Android says “restricted setting”: Settings → Apps → Giga Pisar → ⋮ → Allow restricted settings. Then turn the service on again.</string>
+    <string name="setup_model_title">Download the recognition model</string>
+    <string name="setup_model_text">GigaAM, 225 MB. Downloaded once, then Pisar works offline. Better over Wi-Fi.</string>
+    <string name="setup_model_button">Download</string>
+    <string name="setup_model_retry">Try again</string>
+    <string name="ready_title">All set</string>
+    <string name="ready_text">Hold volume down in any text field and speak. Let go, and the text appears.</string>
+    <string name="ready_try_here">Try it here…</string>
+
+    <string name="ready_text_button">Hold the floating button in any text field and speak. Let go, and the text appears.</string>
+    <string name="ready_text_nothing">Turn on the floating button or the volume key below, otherwise there is nothing to dictate with.</string>
+
+    <string name="section_dictation">Dictation</string>
+    <string name="floating_button">Floating button</string>
+    <string name="floating_button_always">A round record button over other apps</string>
+    <string name="floating_button_text_field">Shows up when a text field is open</string>
+    <string name="volume_key">Record with the volume key</string>
+    <string name="volume_key_hint">Hold volume down and speak</string>
+    <string name="vibration">Vibration</string>
+    <string name="vibration_hint">A short buzz when recording starts and ends</string>
+
+    <string name="section_insertion">Where the text goes</string>
+    <string name="mode_text_field_hint">The text appears at the cursor</string>
+    <string name="mode_clipboard_hint">You paste it yourself with a long press</string>
+
+    <string name="section_permissions">Permissions</string>
+    <string name="section_recognition">Recognition</string>
+    <string name="model_installed_hint">Installed, 225 MB. Works offline</string>
+
+    <string name="section_about">About</string>
+    <string name="about_site">Website</string>
+    <string name="about_source">Source code</string>
+    <string name="about_source_hint">GitHub</string>
+    <string name="about_share">Tell a friend</string>
+    <string name="share_text">Giga Pisar: Russian dictation right on the phone, offline. Download: %1$s</string>
+
+    <string name="section_brain">Brain</string>
+    <string name="brain_key">Service key</string>
+    <string name="brain_switch">Brain</string>
+    <string name="brain_switch_hint">Voice commands at the end of a phrase: “…Pisar, make it shorter”</string>
+    <string name="brain_every_take">Edit on the fly</string>
+    <string name="brain_every_take_hint">Every take: punctuation, no “um” and repeats</string>
+    <string name="brain_privacy">With the Brain, the text goes to the chosen service over the internet. Without it, everything stays on the phone.</string>
+    <string name="brain_key_hint">The service is recognized from the key, the model is picked for you.</string>
+    <string name="brain_key_placeholder">API key</string>
+    <string name="brain_guessed">Looks like a %1$s key</string>
+    <string name="brain_pick_service">Choose the service:</string>
+    <string name="brain_check">Check and save</string>
+    <string name="brain_check_ok">%1$s, %2$s. The test request went through</string>
+    <string name="brain_forget">Delete this service’s key</string>
+    <string name="brain_failed">Brain: %1$s. Inserted as is</string>
+    <string name="brain_failed_unknown">it did not work</string>
+
+    <string name="back">Back</string>
+    <string name="brain_row_none">Off. Needs a DeepSeek, OpenAI or other service key</string>
+    <string name="brain_row_on">On. %1$s, %2$s</string>
+    <string name="brain_row_off">Off. %1$s key saved</string>
+    <string name="brain_services">Services</string>
+    <string name="brain_models">Model</string>
+    <string name="brain_add_key">Add a key</string>
+    <string name="brain_key_saved">Key saved</string>
+    <string name="brain_where_keys">Where to get a key</string>
+    <string name="brain_no_model">no suitable model found</string>
+    <string name="brain_status_ok">Everything works</string>
+    <string name="brain_status_ready">Ready</string>
+    <string name="brain_status_failed">It did not work</string>
+    <string name="brain_status_checking">Checking…</string>
+    <string name="brain_status_none">A key is needed</string>
+    <string name="brain_status_none_text">Paste an API key of a service below, DeepSeek for example. The key is kept encrypted on this phone only.</string>
+
+    <string name="brain_done">✓ The Brain edited it</string>
+    <string name="brain_undo">Undo</string>
+    <string name="brain_undo_changed">The field has changed. The original text is in the clipboard</string>
+    <string name="brain_undo_clipboard">The original text is in the clipboard</string>
+    <string name="language">Language</string>
+    <string name="language_system">Same as the phone</string>
+    <string name="language_ru">Русский</string>
+    <string name="language_en">English</string>
+    <string name="language_close">Close</string>
+    <string name="update_channel">Updates</string>
+    <string name="update_title">Version %1$s is out</string>
+    <string name="update_tap">Tap to update</string>
+    <string name="update_button">Update</string>
+    <string name="update_downloading">Downloading: %1$d%%</string>
+    <string name="update_allow_install">Let Pisar install apps: needed once. Then come back here.</string>
+    <string name="update_allow_button">Continue installing</string>
+    <string name="update_failed">Did not work: %1$s</string>
+    <string name="update_bad_file">the file came down damaged, try again</string>
+</resources>
